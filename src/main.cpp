@@ -6,6 +6,8 @@
 #include "material.h"
 #include "sphere.h"
 
+#include <chrono>
+
 int main()
 {
     hittable_list world;
@@ -37,5 +39,12 @@ int main()
     cam.defocus_angle = 10.0;
     cam.focus_dist = 3.4;
 
+    auto start_time = std::chrono::high_resolution_clock::now();
     cam.render(world);
+    auto end_time = std::chrono::high_resolution_clock::now();
+
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+    double sec = ms / 1000.0;
+
+    std::clog << "Render time: " << sec << " seconds" << std::endl;
 }
