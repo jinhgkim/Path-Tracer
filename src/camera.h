@@ -4,6 +4,8 @@
 #include "hittable.h"
 #include "material.h"
 
+#include <execution>
+
 class camera
 {
   public:
@@ -26,6 +28,34 @@ class camera
 
         std::cout << "P3\n" << image_width << ' ' << image_height << "\n255\n";
 
+#define MT 1
+#if MT
+        std::for_each(std::execution::par, image_height_itr.begin(), image_height_itr.end(),
+                      [this, &world](int j)
+                      {
+                          std::clog << "\rScanlines remaining: " << (image_height - j) << ' '
+                                    << std::flush;
+                          for (int i = 0; i < image_width; i++)
+                          {
+                              color pixel_color(0, 0, 0);
+                              for (int sample = 0; sample < samples_per_pixel; sample++)
+                              {
+                                  ray r = get_ray(i, j);
+                                  pixel_color += ray_color(r, max_depth, world);
+                              }
+                              frameBuffer[j * image_width + i] = pixel_samples_scale * pixel_color;
+                          }
+                      });
+
+        for (int j = 0; j < image_height; j++)
+        {
+            for (int i = 0; i < image_width; i++)
+            {
+                write_color(std::cout, frameBuffer[j * image_width + i]);
+            }
+        }
+
+#else
         for (int j = 0; j < image_height; j++)
         {
             std::clog << "\rScanlines remaining: " << (image_height - j) << ' ' << std::flush;
@@ -41,6 +71,7 @@ class camera
             }
         }
         std::clog << "\rDone.                 \n";
+#endif
     }
 
   private:
@@ -53,11 +84,21 @@ class camera
     vec3 u, v, w; // Camera frame basis vectors
     vec3 defocus_disk_u;
     vec3 defocus_disk_v;
+    std::vector<int> image_height_itr;
+    std::vector<color> frameBuffer;
 
     void initialize()
     {
         image_height = int(image_width / aspect_ratio);
         image_height = (image_height < 1) ? 1 : image_height;
+
+        frameBuffer.resize(image_width * image_height);
+        image_height_itr.resize(image_height);
+
+        for (int i = 0; i < image_height; i++)
+        {
+            image_height_itr[i] = i;
+        }
 
         pixel_samples_scale = 1.0 / samples_per_pixel;
 
@@ -92,8 +133,8 @@ class camera
 
     ray get_ray(int i, int j) const
     {
-        // Construct a camera ray originating from the defocus disk and directed at randomly sampled
-        // point around the pixel location i, j.
+        // Construct a camera ray originating from the defocus disk and directed at randomly
+        // sampled point around the pixel location i, j.
 
         auto offset = sample_square();
         auto pixel_sample =

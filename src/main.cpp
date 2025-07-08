@@ -82,8 +82,10 @@ int main()
     cam.render(world);
     auto end_time = std::chrono::high_resolution_clock::now();
 
-    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
-    double sec = ms / 1000.0;
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
 
-    std::clog << "Render time: " << sec << " seconds" << std::endl;
+    std::clog << "Render time: " << std::chrono::duration_cast<std::chrono::hours>(ms).count()
+              << 'h' << std::chrono::duration_cast<std::chrono::minutes>(ms).count() % 60 << 'm'
+              << std::chrono::duration_cast<std::chrono::seconds>(ms).count() % 60 << 's'
+              << std::endl;
 }

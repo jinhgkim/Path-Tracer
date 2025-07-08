@@ -2,12 +2,15 @@
 
 ![final scene](https://github.com/jinhgkim/Path-Tracer/blob/main/img/final_scene.png)
 
-## 🖼️ Final Render Statistics
+## Final Render Statistics
 
 - **Resolution:** `1200 × 675`
 - **Samples per Pixel:** `500`
-- **Total Render Time:** `6.11 hours (22,004.9 seconds)`
-- **Machine:** `Apple MacBook Pro with M1 chip (single-threaded)`
+- **Machine:** Apple MacBook Pro (M1 chip, 8 cores)
+- **Render Time:**
+  - **Single-threaded:** 6h 6m 44s
+  - **Multithreaded (8 cores):** 53m 42s
 
-This render was generated using a CPU-based path tracer implemented in C++, based on the approach outlined in [_Ray Tracing in One Weekend_](https://raytracing.github.io/books/RayTracingInOneWeekend.html).  
-The renderer currently runs in **single-threaded mode**. Future versions will incorporate **multithreading** for faster rendering.
+This image was rendered using a CPU-based path tracer written in C++, following the approach in [_Ray Tracing in One Weekend_](https://raytracing.github.io/books/RayTracingInOneWeekend.html).
+
+The renderer now supports **multithreading** via C++17 parallel algorithms (`std::execution::par`) and Intel TBB, achieving over **6× speedup** by parallelizing scanline rendering.
