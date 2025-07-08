@@ -1,0 +1,10 @@
+# Pixar style
+
+BasedOnStyle: LLVM
+IndentWidth: 4
+ColumnLimit: 100
+BreakBeforeBraces: Allman
+AllowShortFunctionsOnASingleLine: Inline
+PointerAlignment: Left
+DerivePointerAlignment: false
+SortIncludes: true
