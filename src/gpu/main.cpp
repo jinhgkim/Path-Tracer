@@ -12,23 +12,15 @@
 
 #include <Metal/Metal.hpp>
 
-constexpr std::size_t count = 3'000'000;
-
-std::vector<float> randomArray(std::size_t n = count)
-{
-    std::vector<float> v(n);
-    for (std::size_t i = 0; i < n; i++)
-        v[i] = (std::rand() / float(RAND_MAX)) * 10.0f;
-    return v;
-}
-
 using Clock = std::chrono::high_resolution_clock;
 
 int main()
 {
-    // Create random arrays
-    std::vector<float> arr1 = randomArray();
-    std::vector<float> arr2 = randomArray();
+    // Define image
+    constexpr int image_width = 256;
+    constexpr int image_height = 256;
+    constexpr int num_pixels = image_width * image_height;
+    constexpr int num_pixels_RGB = 3 * num_pixels;
 
     // C++ RAII
     NS::AutoreleasePool* pool = NS::AutoreleasePool::alloc()->init();
@@ -48,8 +40,7 @@ int main()
     }
 
     // Grab our gpu function
-    auto fn =
-        lib->newFunction(NS::String::string("addition_compute_function", NS::UTF8StringEncoding));
+    auto fn = lib->newFunction(NS::String::string("gradient_shader", NS::UTF8StringEncoding));
     if (!fn)
     {
         std::cerr << "Kernel not found in metallib\n";
@@ -67,12 +58,12 @@ int main()
 
     // Create the buffers to be sent to the gpu from our arrays
     const auto mode = MTL::ResourceStorageModeShared; // shared CPU-GPU memory
-    auto arr1Buff = device->newBuffer(arr1.data(), arr1.size() * sizeof(float), mode);
-    auto arr2Buff = device->newBuffer(arr2.data(), arr2.size() * sizeof(float), mode);
-    auto resultBuff = device->newBuffer(arr1.size() * sizeof(float), mode);
+    auto imageBuff = device->newBuffer(num_pixels_RGB * sizeof(int), mode);
+    auto widthBuff = device->newBuffer(&image_width, sizeof(int), mode);
+    auto heightBuff = device->newBuffer(&image_height, sizeof(int), mode);
 
     // GPU timer starts
-    auto gpuStart = Clock::now();
+    auto timerStart = Clock::now();
 
     // Create a buffer to be sent to the command queue
     auto comandBuffer = commandQueue->commandBuffer();
@@ -82,13 +73,14 @@ int main()
     commandEncoder->setComputePipelineState(pipe);
 
     // Set the parameters of our gpu function
-    commandEncoder->setBuffer(arr1Buff, 0, 0);
-    commandEncoder->setBuffer(arr2Buff, 0, 1);
-    commandEncoder->setBuffer(resultBuff, 0, 2);
+    commandEncoder->setBuffer(imageBuff, 0, 0);
+    commandEncoder->setBuffer(widthBuff, 0, 1);
+    commandEncoder->setBuffer(heightBuff, 0, 2);
 
-    // Figure out how many threads we need to use for our operatio
-    std::size_t maxThreadsPerThreadGroup = pipe->maxTotalThreadsPerThreadgroup(); // 1024
-    commandEncoder->dispatchThreads({count, 1, 1}, {maxThreadsPerThreadGroup, 1, 1});
+    // Figure out how many threads we need to use for our operation
+    MTL::Size gridSize = MTL::Size::Make(image_width, image_height, 1);
+    MTL::Size threadgroupSize = MTL::Size::Make(16, 16, 1); // 16×16 = 256
+    commandEncoder->dispatchThreads(gridSize, threadgroupSize);
 
     // Tell the encoder that it is done encoding.  Now we can send this off to the gpu.
     commandEncoder->endEncoding();
@@ -99,34 +91,37 @@ int main()
     // Wait until the gpu function completes before working with any of the data
     comandBuffer->waitUntilCompleted();
 
-    double gpuTime = std::chrono::duration<double>(Clock::now() - gpuStart).count();
-
     // Get the pointer to the beginning of our data
-    const float* gpuOut = static_cast<const float*>(resultBuff->contents());
+    const int* pixels = static_cast<const int*>(imageBuff->contents());
 
-    std::cout << "\nGPU\n";
-    for (int i = 0; i < 3; i++)
-        std::cout << arr1[i] << " + " << arr2[i] << " = " << gpuOut[i] << '\n';
-    std::cout << "Time elapsed  " << std::fixed << std::setprecision(5) << gpuTime << " s\n\n";
+    // Output an image
+    std::cout << "P3\n" << image_width << " " << image_height << "\n255\n";
+    for (int j = 0; j < image_height; j++)
+    {
+        std::clog << "\rScanlines remaining: " << (image_height - j) << ' ' << std::flush;
+        for (int i = 0; i < image_width; i++)
+        {
+            size_t idx = j * image_width * 3 + i * 3;
 
-    // CPU timer starts
-    auto cpuStart = Clock::now();
+            int ir = pixels[idx + 0];
+            int ig = pixels[idx + 1];
+            int ib = pixels[idx + 2];
 
-    std::vector<float> cpuOut(count);
-    for (std::size_t i = 0; i < count; i++)
-        cpuOut[i] = arr1[i] + arr2[i];
+            std::cout << ir << " " << ig << " " << ib << "\n";
+        }
+    }
 
-    double cpuTime = std::chrono::duration<double>(Clock::now() - cpuStart).count();
+    // Render time
+    auto timerEnd = Clock::now();
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(timerEnd - timerStart);
 
-    std::cout << "CPU\n";
-    for (int i = 0; i < 3; i++)
-        std::cout << arr1[i] << " + " << arr2[i] << " = " << cpuOut[i] << '\n';
-    std::cout << "Time elapsed    " << std::fixed << std::setprecision(5) << cpuTime << " s\n";
+    std::clog << "Render time: " << std::chrono::duration_cast<std::chrono::hours>(ms).count()
+              << "h " << std::chrono::duration_cast<std::chrono::minutes>(ms).count() % 60 << "m "
+              << std::chrono::duration_cast<std::chrono::seconds>(ms).count() % 60 << "s "
+              << std::endl;
 
     // Cleanup
-    resultBuff->release();
-    arr2Buff->release();
-    arr1Buff->release();
+    imageBuff->release();
     pipe->release();
     fn->release();
     lib->release();
@@ -135,19 +130,3 @@ int main()
     pool->release();
     return 0;
 }
-
-/* Example output:
-
-GPU
-5.392 + 0.831621 = 6.22362
-7.85796 + 5.35374 = 13.2117
-4.27459 + 6.07924 = 10.3538
-Time elapsed  0.00439 s
-
-CPU
-5.39200 + 0.83162 = 6.22362
-7.85796 + 5.35374 = 13.21170
-4.27459 + 6.07924 = 10.35383
-Time elapsed    0.03291 s
-
-*/
