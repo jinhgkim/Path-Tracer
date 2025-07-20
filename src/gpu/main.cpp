@@ -11,6 +11,7 @@
 #define MTL_PRIVATE_IMPLEMENTATION
 
 #include <Metal/Metal.hpp>
+#include <simd/simd.h>
 
 using Clock = std::chrono::high_resolution_clock;
 
@@ -20,7 +21,6 @@ int main()
     constexpr int image_width = 256;
     constexpr int image_height = 256;
     constexpr int num_pixels = image_width * image_height;
-    constexpr int num_pixels_RGB = 3 * num_pixels;
 
     // C++ RAII
     NS::AutoreleasePool* pool = NS::AutoreleasePool::alloc()->init();
@@ -58,7 +58,7 @@ int main()
 
     // Create the buffers to be sent to the gpu from our arrays
     const auto mode = MTL::ResourceStorageModeShared; // shared CPU-GPU memory
-    auto imageBuff = device->newBuffer(num_pixels_RGB * sizeof(int), mode);
+    auto imageBuff = device->newBuffer(num_pixels * sizeof(simd::float3), mode);
     auto widthBuff = device->newBuffer(&image_width, sizeof(int), mode);
     auto heightBuff = device->newBuffer(&image_height, sizeof(int), mode);
 
@@ -92,7 +92,7 @@ int main()
     comandBuffer->waitUntilCompleted();
 
     // Get the pointer to the beginning of our data
-    const int* pixels = static_cast<const int*>(imageBuff->contents());
+    const simd::float3* pixels = static_cast<const simd::float3*>(imageBuff->contents());
 
     // Output an image
     std::cout << "P3\n" << image_width << " " << image_height << "\n255\n";
@@ -101,11 +101,12 @@ int main()
         std::clog << "\rScanlines remaining: " << (image_height - j) << ' ' << std::flush;
         for (int i = 0; i < image_width; i++)
         {
-            size_t idx = j * image_width * 3 + i * 3;
+            size_t idx = j * image_width + i;
+            simd::float3 pixel = pixels[idx];
 
-            int ir = pixels[idx + 0];
-            int ig = pixels[idx + 1];
-            int ib = pixels[idx + 2];
+            int ir = int(255.99 * pixel[0]);
+            int ig = int(255.99 * pixel[1]);
+            int ib = int(255.99 * pixel[2]);
 
             std::cout << ir << " " << ig << " " << ib << "\n";
         }
