@@ -15,12 +15,43 @@
 
 using Clock = std::chrono::high_resolution_clock;
 
+struct CameraCPU
+{
+    simd::float3 pixel00_loc;
+    simd::float3 pixel_delta_u;
+    simd::float3 pixel_delta_v;
+    simd::float3 center;
+    uint image_width;
+    uint image_height;
+};
+
 int main()
 {
-    // Define image
-    constexpr int image_width = 256;
-    constexpr int image_height = 256;
-    constexpr int num_pixels = image_width * image_height;
+    CameraCPU c;
+
+    // Image
+    const float aspect_ratio = 16.0 / 9.0;
+
+    c.image_width = 400;
+    c.image_height = int(c.image_width / aspect_ratio);
+    c.image_height = (c.image_height < 1) ? 1 : c.image_height;
+
+    int num_pixels = c.image_width * c.image_height;
+
+    // Camera
+    simd::float3 focal_length = simd::float3{0.0f, 0.0f, 1.0f};
+    auto viewport_height = 2.0f;
+    auto viewport_width = viewport_height * (float(c.image_width) / c.image_height);
+
+    c.center = simd::float3{0.0f, 0.0f, 0.0f};
+    auto viewport_u = simd::float3{viewport_width, 0, 0};
+    auto viewport_v = simd::float3{0, -viewport_height, 0};
+
+    c.pixel_delta_u = viewport_u / float(c.image_width);
+    c.pixel_delta_v = viewport_v / float(c.image_height);
+
+    auto viewport_upper_left = c.center - viewport_u * 0.5f - viewport_v * 0.5f - focal_length;
+    c.pixel00_loc = viewport_upper_left + 0.5f * (c.pixel_delta_u + c.pixel_delta_v);
 
     // C++ RAII
     NS::AutoreleasePool* pool = NS::AutoreleasePool::alloc()->init();
@@ -40,7 +71,7 @@ int main()
     }
 
     // Grab our gpu function
-    auto fn = lib->newFunction(NS::String::string("gradient_shader", NS::UTF8StringEncoding));
+    auto fn = lib->newFunction(NS::String::string("render", NS::UTF8StringEncoding));
     if (!fn)
     {
         std::cerr << "Kernel not found in metallib\n";
@@ -59,8 +90,7 @@ int main()
     // Create the buffers to be sent to the gpu from our arrays
     const auto mode = MTL::ResourceStorageModeShared; // shared CPU-GPU memory
     auto imageBuff = device->newBuffer(num_pixels * sizeof(simd::float3), mode);
-    auto widthBuff = device->newBuffer(&image_width, sizeof(int), mode);
-    auto heightBuff = device->newBuffer(&image_height, sizeof(int), mode);
+    auto cameraBufF = device->newBuffer(&c, sizeof(CameraCPU), mode);
 
     // GPU timer starts
     auto timerStart = Clock::now();
@@ -74,11 +104,10 @@ int main()
 
     // Set the parameters of our gpu function
     commandEncoder->setBuffer(imageBuff, 0, 0);
-    commandEncoder->setBuffer(widthBuff, 0, 1);
-    commandEncoder->setBuffer(heightBuff, 0, 2);
+    commandEncoder->setBuffer(cameraBufF, 0, 1);
 
     // Figure out how many threads we need to use for our operation
-    MTL::Size gridSize = MTL::Size::Make(image_width, image_height, 1);
+    MTL::Size gridSize = MTL::Size::Make(c.image_width, c.image_height, 1);
     MTL::Size threadgroupSize = MTL::Size::Make(16, 16, 1); // 16×16 = 256
     commandEncoder->dispatchThreads(gridSize, threadgroupSize);
 
@@ -95,13 +124,13 @@ int main()
     const simd::float3* pixels = static_cast<const simd::float3*>(imageBuff->contents());
 
     // Output an image
-    std::cout << "P3\n" << image_width << " " << image_height << "\n255\n";
-    for (int j = 0; j < image_height; j++)
+    std::cout << "P3\n" << c.image_width << " " << c.image_height << "\n255\n";
+    for (int j = 0; j < c.image_height; j++)
     {
-        std::clog << "\rScanlines remaining: " << (image_height - j) << ' ' << std::flush;
-        for (int i = 0; i < image_width; i++)
+        std::clog << "\rScanlines remaining: " << (c.image_height - j) << ' ' << std::flush;
+        for (int i = 0; i < c.image_width; i++)
         {
-            size_t idx = j * image_width + i;
+            size_t idx = j * c.image_width + i;
             simd::float3 pixel = pixels[idx];
 
             int ir = int(255.99 * pixel[0]);
@@ -123,6 +152,7 @@ int main()
 
     // Cleanup
     imageBuff->release();
+    cameraBufF->release();
     pipe->release();
     fn->release();
     lib->release();
