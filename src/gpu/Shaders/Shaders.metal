@@ -24,19 +24,27 @@ struct Camera
     uint image_height;
 };
 
-bool hit_sphere(thread const float3& center, float radius, thread const Ray& r) {
+float hit_sphere(thread const float3& center, float radius, thread const Ray& r) {
     float3 oc = center - r.origin();
-    float a = dot(r.direction(), r.direction());
-    float b = -2.0 * dot(r.direction(), oc);
-    float c = dot(oc, oc) - radius*radius;
-    float discriminant = b*b - 4*a*c;
-    return (discriminant >= 0);
+    float a = length_squared(r.direction());
+    float h = dot(r.direction(), oc);
+    float c = length_squared(oc) - radius*radius;
+    float discriminant = h*h - a*c;
+
+    if (discriminant < 0.0f) {
+        return -1.0f;
+    } else {
+        return (h - sqrt(discriminant)) / a;
+    }
 }
  
 float3 ray_color(thread const Ray& r)
 {
-    if (hit_sphere(float3(0.0f,0.0f,-1.0f), 0.5f, r))
-        return float3(1.0f, 0.0f, 0.0f);
+    float t = hit_sphere(float3(0.0f, 0.0f, -1.0f), 0.5f, r);
+    if (t > 0.0f) {
+        float3 N = normalize(r.at(t) - float3(0.0f, 0.0f, -1.0f));
+        return 0.5f * float3(N.x + 1.0f, N.y + 1.0f, N.z + 1.0f);
+    }
 
     float3 unit_direction = normalize(r.direction());
     float a = 0.5f * (unit_direction.y + 1.0f);
