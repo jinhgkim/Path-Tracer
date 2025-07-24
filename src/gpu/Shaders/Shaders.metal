@@ -24,48 +24,98 @@ struct Camera
     uint image_height;
 };
 
+struct HitRecord
+{
+    float3 p;
+    float3 normal;
+    float t;
+    bool front_face;
+
+    void set_face_normal(thread const Ray& r, thread const float3& outward_normal) {
+        front_face = dot(r.direction(), outward_normal) < 0;
+        normal = front_face ? outward_normal : -outward_normal;
+    }
+};
+
 struct Sphere
 {
     float3 center;
     float radius;
+
+    bool hit(thread const Ray& r, float ray_tmin, float ray_tmax,
+             thread HitRecord& rec) const constant
+    {
+        float3 oc = center - r.origin();
+        float a = length_squared(r.direction());
+        float h = dot(r.direction(), oc);
+        float c = length_squared(oc) - radius * radius;
+
+        float discriminant = h * h - a * c;
+        if (discriminant < 0)
+            return false;
+
+        float sqrtd = sqrt(discriminant);
+
+        // Find the nearest root that lies in the acceptable range.
+        float root = (h - sqrtd) / a;
+        if (root <= ray_tmin || ray_tmax <= root)
+        {
+            root = (h + sqrtd) / a;
+            if (root <= ray_tmin || ray_tmax <= root)
+                return false;
+        }
+
+        rec.t = root;
+        rec.p = r.at(rec.t);
+
+        float3 outward_normal = (rec.p - center) / radius;
+        rec.set_face_normal(r, outward_normal);
+
+        return true;
+    }
 };
 
-float hit_sphere(device const float3& center, float radius, thread const Ray& r) {
-    float3 oc = center - r.origin();
-    float a = length_squared(r.direction());
-    float h = dot(r.direction(), oc);
-    float c = length_squared(oc) - radius*radius;
-    float discriminant = h*h - a*c;
-
-    if (discriminant < 0.0f) {
-        return -1.0f;
-    } else {
-        return (h - sqrt(discriminant)) / a;
-    }
-}
- 
-float3 ray_color(thread const Ray& r, device const Sphere& s)
+bool hit(constant Sphere* world, constant uint& count, thread const Ray& r, float ray_tmin,
+         float ray_tmax, thread HitRecord& rec)
 {
-    float t = hit_sphere(s.center, s.radius, r);
-    if (t > 0.0f) {
-        float3 N = normalize(r.at(t) - float3(0.0f, 0.0f, -1.0f));
-        return 0.5f * float3(N.x + 1.0f, N.y + 1.0f, N.z + 1.0f);
+    HitRecord temp_rec;
+    bool hit_anything = false;
+    auto closest_so_far = ray_tmax;
+
+    for (uint i = 0; i < count; i++)
+    {
+        if (world[i].hit(r, ray_tmin, closest_so_far, temp_rec))
+        {
+            hit_anything = true;
+            closest_so_far = temp_rec.t;
+            rec = temp_rec;
+        }
+    }
+
+    return hit_anything;
+}
+
+float3 ray_color(thread const Ray& r, constant Sphere* world, constant uint& count)
+{
+    HitRecord rec;
+    if (hit(world, count, r, 0.0f, INFINITY, rec))
+    {
+        return 0.5f * (rec.normal + float3(1.0f, 1.0f, 1.0f));
     }
 
     float3 unit_direction = normalize(r.direction());
     float a = 0.5f * (unit_direction.y + 1.0f);
-
-    return mix(float3(1.0f, 1.0f, 1.0f),
-               float3(0.5f, 0.7f, 1.0f),
-               a);
+    return mix(float3(1.0f, 1.0f, 1.0f), float3(0.5f, 0.7f, 1.0f), a);
 }
 
-kernel void render(device float3* pixel_color      [[buffer(0)]],
-                   const device Camera& c          [[buffer(1)]],
-                   const device Sphere& s          [[buffer(2)]],
-                   uint2 gid  [[thread_position_in_grid]])
+kernel void render(device float3* pixel_color   [[buffer(0)]], 
+                   constant Camera& c           [[buffer(1)]],
+                   constant Sphere* world       [[buffer(2)]], 
+                   constant uint& count         [[buffer(3)]],
+                   uint2 gid        [[thread_position_in_grid]])
 {
-    if (gid.x >= c.image_width || gid.y >= c.image_height) return;
+    if (gid.x >= c.image_width || gid.y >= c.image_height)
+        return;
 
     uint idx = gid.y * c.image_width + gid.x;
 
@@ -74,5 +124,5 @@ kernel void render(device float3* pixel_color      [[buffer(0)]],
 
     Ray r(c.center, ray_direction);
 
-    pixel_color[idx] = ray_color(r, s);
+    pixel_color[idx] = ray_color(r, world, count);
 }
