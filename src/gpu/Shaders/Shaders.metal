@@ -24,7 +24,13 @@ struct Camera
     uint image_height;
 };
 
-float hit_sphere(thread const float3& center, float radius, thread const Ray& r) {
+struct Sphere
+{
+    float3 center;
+    float radius;
+};
+
+float hit_sphere(device const float3& center, float radius, thread const Ray& r) {
     float3 oc = center - r.origin();
     float a = length_squared(r.direction());
     float h = dot(r.direction(), oc);
@@ -38,9 +44,9 @@ float hit_sphere(thread const float3& center, float radius, thread const Ray& r)
     }
 }
  
-float3 ray_color(thread const Ray& r)
+float3 ray_color(thread const Ray& r, device const Sphere& s)
 {
-    float t = hit_sphere(float3(0.0f, 0.0f, -1.0f), 0.5f, r);
+    float t = hit_sphere(s.center, s.radius, r);
     if (t > 0.0f) {
         float3 N = normalize(r.at(t) - float3(0.0f, 0.0f, -1.0f));
         return 0.5f * float3(N.x + 1.0f, N.y + 1.0f, N.z + 1.0f);
@@ -56,6 +62,7 @@ float3 ray_color(thread const Ray& r)
 
 kernel void render(device float3* pixel_color      [[buffer(0)]],
                    const device Camera& c          [[buffer(1)]],
+                   const device Sphere& s          [[buffer(2)]],
                    uint2 gid  [[thread_position_in_grid]])
 {
     if (gid.x >= c.image_width || gid.y >= c.image_height) return;
@@ -67,5 +74,5 @@ kernel void render(device float3* pixel_color      [[buffer(0)]],
 
     Ray r(c.center, ray_direction);
 
-    pixel_color[idx] = ray_color(r);
+    pixel_color[idx] = ray_color(r, s);
 }
