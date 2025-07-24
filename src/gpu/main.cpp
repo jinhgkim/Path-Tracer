@@ -25,14 +25,6 @@ struct Camera
     uint image_height;
 };
 
-struct HitRecord
-{
-    simd::float3 p;
-    simd::float3 normal;
-    float t;
-    bool front_face;
-};
-
 struct Sphere
 {
     simd::float3 center;
@@ -68,9 +60,8 @@ int main()
     c.pixel00_loc = viewport_upper_left + 0.5f * (c.pixel_delta_u + c.pixel_delta_v);
 
     // World
-    Sphere s;
-    s.center = simd::float3{0.0f, 0.0f, -1.0f};
-    s.radius = 0.5f;
+    std::vector<Sphere> world = {{simd::float3{0.0f, 0.0f, -1.0f}, 0.5f},
+                                 {simd::float3{0.0f, -100.5f, -1.0f}, 100.0f}};
 
     // C++ RAII
     NS::AutoreleasePool* pool = NS::AutoreleasePool::alloc()->init();
@@ -110,7 +101,9 @@ int main()
     const auto mode = MTL::ResourceStorageModeShared; // shared CPU-GPU memory
     auto imageBuff = device->newBuffer(num_pixels * sizeof(simd::float3), mode);
     auto cameraBuff = device->newBuffer(&c, sizeof(Camera), mode);
-    auto sphereBuff = device->newBuffer(&s, sizeof(Sphere), mode);
+    auto worldBuff = device->newBuffer(world.data(), world.size() * sizeof(Sphere), mode);
+    uint count = static_cast<uint>(world.size());
+    auto countBuff = device->newBuffer(&count, sizeof(Sphere), mode);
 
     // GPU timer starts
     auto timerStart = Clock::now();
@@ -125,7 +118,8 @@ int main()
     // Set the parameters of our gpu function
     commandEncoder->setBuffer(imageBuff, 0, 0);
     commandEncoder->setBuffer(cameraBuff, 0, 1);
-    commandEncoder->setBuffer(sphereBuff, 0, 2);
+    commandEncoder->setBuffer(worldBuff, 0, 2);
+    commandEncoder->setBuffer(countBuff, 0, 3);
 
     // Figure out how many threads we need to use for our operation
     MTL::Size gridSize = MTL::Size::Make(c.image_width, c.image_height, 1);
@@ -174,7 +168,8 @@ int main()
     // Cleanup
     imageBuff->release();
     cameraBuff->release();
-    sphereBuff->release();
+    worldBuff->release();
+    countBuff->release();
     pipe->release();
     fn->release();
     lib->release();
