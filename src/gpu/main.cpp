@@ -15,7 +15,7 @@
 
 using Clock = std::chrono::high_resolution_clock;
 
-struct CameraCPU
+struct Camera
 {
     simd::float3 pixel00_loc;
     simd::float3 pixel_delta_u;
@@ -25,9 +25,23 @@ struct CameraCPU
     uint image_height;
 };
 
+struct HitRecord
+{
+    simd::float3 p;
+    simd::float3 normal;
+    float t;
+    bool front_face;
+};
+
+struct Sphere
+{
+    simd::float3 center;
+    float radius;
+};
+
 int main()
 {
-    CameraCPU c;
+    Camera c;
 
     // Image
     const float aspect_ratio = 16.0 / 9.0;
@@ -52,6 +66,11 @@ int main()
 
     auto viewport_upper_left = c.center - viewport_u * 0.5f - viewport_v * 0.5f - focal_length;
     c.pixel00_loc = viewport_upper_left + 0.5f * (c.pixel_delta_u + c.pixel_delta_v);
+
+    // World
+    Sphere s;
+    s.center = simd::float3{0.0f, 0.0f, -1.0f};
+    s.radius = 0.5f;
 
     // C++ RAII
     NS::AutoreleasePool* pool = NS::AutoreleasePool::alloc()->init();
@@ -90,7 +109,8 @@ int main()
     // Create the buffers to be sent to the gpu from our arrays
     const auto mode = MTL::ResourceStorageModeShared; // shared CPU-GPU memory
     auto imageBuff = device->newBuffer(num_pixels * sizeof(simd::float3), mode);
-    auto cameraBufF = device->newBuffer(&c, sizeof(CameraCPU), mode);
+    auto cameraBuff = device->newBuffer(&c, sizeof(Camera), mode);
+    auto sphereBuff = device->newBuffer(&s, sizeof(Sphere), mode);
 
     // GPU timer starts
     auto timerStart = Clock::now();
@@ -104,7 +124,8 @@ int main()
 
     // Set the parameters of our gpu function
     commandEncoder->setBuffer(imageBuff, 0, 0);
-    commandEncoder->setBuffer(cameraBufF, 0, 1);
+    commandEncoder->setBuffer(cameraBuff, 0, 1);
+    commandEncoder->setBuffer(sphereBuff, 0, 2);
 
     // Figure out how many threads we need to use for our operation
     MTL::Size gridSize = MTL::Size::Make(c.image_width, c.image_height, 1);
@@ -152,7 +173,8 @@ int main()
 
     // Cleanup
     imageBuff->release();
-    cameraBufF->release();
+    cameraBuff->release();
+    sphereBuff->release();
     pipe->release();
     fn->release();
     lib->release();
