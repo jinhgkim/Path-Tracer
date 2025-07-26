@@ -23,6 +23,7 @@ struct Camera
     simd::float3 center;
     uint image_width;
     uint image_height;
+    uint samples_per_pixel;
 };
 
 struct Sphere
@@ -58,6 +59,8 @@ int main()
 
     auto viewport_upper_left = c.center - viewport_u * 0.5f - viewport_v * 0.5f - focal_length;
     c.pixel00_loc = viewport_upper_left + 0.5f * (c.pixel_delta_u + c.pixel_delta_v);
+
+    c.samples_per_pixel = 100;
 
     // World
     std::vector<Sphere> world = {{simd::float3{0.0f, 0.0f, -1.0f}, 0.5f},
