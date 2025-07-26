@@ -22,6 +22,7 @@ struct Camera
     float3 center;
     uint image_width;
     uint image_height;
+    uint samples_per_pixel;
 };
 
 struct HitRecord
@@ -31,7 +32,8 @@ struct HitRecord
     float t;
     bool front_face;
 
-    void set_face_normal(thread const Ray& r, thread const float3& outward_normal) {
+    void set_face_normal(thread const Ray& r, thread const float3& outward_normal)
+    {
         front_face = dot(r.direction(), outward_normal) < 0;
         normal = front_face ? outward_normal : -outward_normal;
     }
@@ -80,7 +82,7 @@ bool hit(constant Sphere* world, constant uint& count, thread const Ray& r, floa
 {
     HitRecord temp_rec;
     bool hit_anything = false;
-    auto closest_so_far = ray_tmax;
+    float closest_so_far = ray_tmax;
 
     for (uint i = 0; i < count; i++)
     {
@@ -108,21 +110,34 @@ float3 ray_color(thread const Ray& r, constant Sphere* world, constant uint& cou
     return mix(float3(1.0f, 1.0f, 1.0f), float3(0.5f, 0.7f, 1.0f), a);
 }
 
-kernel void render(device float3* pixel_color   [[buffer(0)]], 
-                   constant Camera& c           [[buffer(1)]],
-                   constant Sphere* world       [[buffer(2)]], 
-                   constant uint& count         [[buffer(3)]],
-                   uint2 gid        [[thread_position_in_grid]])
+// Returns a random real in [0,1).
+float random_float(float2 seed)
+{
+    return fract(sin(dot(seed.xy, float2(12.9898, 78.233))) * 43758.5453);
+}
+
+kernel void render(device float3* pixel_color    [[buffer(0)]], 
+                   constant Camera& c            [[buffer(1)]],
+                   constant Sphere* world        [[buffer(2)]],
+                   constant uint& count          [[buffer(3)]],
+                   uint2 gid   [[thread_position_in_grid]])
 {
     if (gid.x >= c.image_width || gid.y >= c.image_height)
         return;
 
     uint idx = gid.y * c.image_width + gid.x;
 
-    float3 pixel_center = c.pixel00_loc + (gid.x * c.pixel_delta_u) + (gid.y * c.pixel_delta_v);
-    float3 ray_direction = pixel_center - c.center;
+    float3 color_acc(0.0f, 0.0f, 0.0f);
+    for (uint s = 0; s < c.samples_per_pixel; s++)
+    {
+        float rand_val = random_float(float2(gid.x * float(s), gid.y * float(s)));
+        float3 offset = float3(rand_val - 0.5f, rand_val - 0.5f, 0.0f);
+        float3 pixel_sample = c.pixel00_loc + ((gid.x + offset.x) * c.pixel_delta_u) +
+                              ((gid.y + offset.y) * c.pixel_delta_v);
+        float3 ray_direction = pixel_sample - c.center;
 
-    Ray r(c.center, ray_direction);
-
-    pixel_color[idx] = ray_color(r, world, count);
+        Ray r(c.center, ray_direction);
+        color_acc += ray_color(r, world, count);
+    }
+    pixel_color[idx] = color_acc / c.samples_per_pixel;
 }
