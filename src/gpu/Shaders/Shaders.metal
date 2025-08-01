@@ -1,6 +1,30 @@
 #include <metal_stdlib>
 using namespace metal;
 
+struct RNG
+{
+    uint state;
+
+    void init(uint x) { state = x; }
+
+    uint next_uint()
+    {
+        state ^= state >> 17;
+        state *= 0xed5ad4bb;
+        state ^= state >> 11;
+        state *= 0xac4c1b51;
+        state ^= state >> 15;
+        state *= 0x31848bab;
+        state ^= state >> 14;
+        return state;
+    }
+
+    float next_float()
+    {
+        return float(next_uint()) / 4294967296.0; // [0, 1)
+    }
+};
+
 struct Ray
 {
     float3 orig;
@@ -77,6 +101,49 @@ struct Sphere
     }
 };
 
+// Returns a random real in [0,1).
+float random_float(thread RNG& seed)
+{
+    return seed.next_float();
+}
+
+// Returns a random real in [min,max).
+float random_float(float min, float max, thread RNG& seed)
+{
+    return min + (max - min) * random_float(seed);
+}
+
+float3 random(thread RNG& seed)
+{
+    return float3(random_float(seed), random_float(seed), random_float(seed));
+}
+
+float3 random(float min, float max, thread RNG& seed)
+{
+    return float3(random_float(min, max, seed), random_float(min, max, seed),
+                  random_float(min, max, seed));
+}
+
+float3 random_unit_vector(thread RNG& seed)
+{
+    while (true)
+    {
+        float3 p = random(-1.0f, 1.0f, seed);
+        float lensq = length_squared(p);
+        if (1e-40f < lensq && lensq <= 1.0f)
+            return normalize(p);
+    }
+}
+
+float3 random_on_hemisphere(thread const float3& normal, thread RNG& seed)
+{
+    float3 on_unit_sphere = random_unit_vector(seed);
+    if (dot(on_unit_sphere, normal) > 0.0f) // In the same hemisphere as the normal
+        return on_unit_sphere;
+    else
+        return -on_unit_sphere;
+}
+
 bool hit(constant Sphere* world, constant uint& count, thread const Ray& r, float ray_tmin,
          float ray_tmax, thread HitRecord& rec)
 {
@@ -97,30 +164,37 @@ bool hit(constant Sphere* world, constant uint& count, thread const Ray& r, floa
     return hit_anything;
 }
 
-float3 ray_color(thread const Ray& r, constant Sphere* world, constant uint& count)
+float3 ray_color(thread const Ray& r, constant Sphere* world, constant uint& count,
+                 thread RNG& seed)
 {
-    HitRecord rec;
-    if (hit(world, count, r, 0.0f, INFINITY, rec))
+    Ray curr_ray = r;
+    float curr_attenuation = 1.0f;
+
+    for (int i = 0; i < 50; i++)
     {
-        return 0.5f * (rec.normal + float3(1.0f, 1.0f, 1.0f));
+
+        HitRecord rec;
+        if (hit(world, count, curr_ray, 0.0f, INFINITY, rec))
+        {
+            float3 direction = random_on_hemisphere(rec.normal, seed);
+            curr_attenuation *= 0.5f;
+            curr_ray = Ray(rec.p, direction);
+        }
+        else
+        {
+            float3 unit_direction = normalize(curr_ray.direction());
+            float a = 0.5f * (unit_direction.y + 1.0f);
+            return curr_attenuation * mix(float3(1.0f, 1.0f, 1.0f), float3(0.5f, 0.7f, 1.0f), a);
+        }
     }
-
-    float3 unit_direction = normalize(r.direction());
-    float a = 0.5f * (unit_direction.y + 1.0f);
-    return mix(float3(1.0f, 1.0f, 1.0f), float3(0.5f, 0.7f, 1.0f), a);
+    return float3(0.0f, 0.0f, 0.0f);
 }
 
-// Returns a random real in [0,1).
-float random_float(float2 seed)
-{
-    return fract(sin(dot(seed.xy, float2(12.9898, 78.233))) * 43758.5453);
-}
-
-kernel void render(device float3* pixel_color    [[buffer(0)]], 
-                   constant Camera& c            [[buffer(1)]],
-                   constant Sphere* world        [[buffer(2)]],
-                   constant uint& count          [[buffer(3)]],
-                   uint2 gid   [[thread_position_in_grid]])
+kernel void render(device float3* pixel_color   [[buffer(0)]], 
+                   constant Camera& c           [[buffer(1)]],
+                   constant Sphere* world       [[buffer(2)]], 
+                   constant uint& count         [[buffer(3)]],
+                   uint2 gid        [[thread_position_in_grid]])
 {
     if (gid.x >= c.image_width || gid.y >= c.image_height)
         return;
@@ -128,16 +202,19 @@ kernel void render(device float3* pixel_color    [[buffer(0)]],
     uint idx = gid.y * c.image_width + gid.x;
 
     float3 color_acc(0.0f, 0.0f, 0.0f);
+
+    RNG seed;
+    seed.init(idx);
+
     for (uint s = 0; s < c.samples_per_pixel; s++)
     {
-        float rand_val = random_float(float2(gid.x * float(s), gid.y * float(s)));
-        float3 offset = float3(rand_val - 0.5f, rand_val - 0.5f, 0.0f);
+        float3 offset = float3(random_float(seed) - 0.5f, random_float(seed) - 0.5f, 0.0f);
         float3 pixel_sample = c.pixel00_loc + ((gid.x + offset.x) * c.pixel_delta_u) +
                               ((gid.y + offset.y) * c.pixel_delta_v);
         float3 ray_direction = pixel_sample - c.center;
 
         Ray r(c.center, ray_direction);
-        color_acc += ray_color(r, world, count);
+        color_acc += ray_color(r, world, count, seed);
     }
     pixel_color[idx] = color_acc / c.samples_per_pixel;
 }
