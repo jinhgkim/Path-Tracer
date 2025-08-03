@@ -144,6 +144,14 @@ float3 random_on_hemisphere(thread const float3& normal, thread RNG& seed)
         return -on_unit_sphere;
 }
 
+float linear_to_gamma(float linear_component)
+{
+    if (linear_component > 0)
+        return sqrt(linear_component);
+
+    return 0;
+}
+
 bool hit(constant Sphere* world, constant uint& count, thread const Ray& r, float ray_tmin,
          float ray_tmax, thread HitRecord& rec)
 {
@@ -176,7 +184,7 @@ float3 ray_color(thread const Ray& r, constant Sphere* world, constant uint& cou
         HitRecord rec;
         if (hit(world, count, curr_ray, 0.001f, INFINITY, rec))
         {
-            float3 direction = random_on_hemisphere(rec.normal, seed);
+            float3 direction = rec.normal + random_unit_vector(seed);
             curr_attenuation *= 0.5f;
             curr_ray = Ray(rec.p, direction);
         }
@@ -190,9 +198,9 @@ float3 ray_color(thread const Ray& r, constant Sphere* world, constant uint& cou
     return float3(0.0f, 0.0f, 0.0f);
 }
 
-kernel void render(device float3* pixel_color   [[buffer(0)]], 
+kernel void render(device float3* pixel_color   [[buffer(0)]],
                    constant Camera& c           [[buffer(1)]],
-                   constant Sphere* world       [[buffer(2)]], 
+                   constant Sphere* world       [[buffer(2)]],
                    constant uint& count         [[buffer(3)]],
                    uint2 gid        [[thread_position_in_grid]])
 {
@@ -216,5 +224,7 @@ kernel void render(device float3* pixel_color   [[buffer(0)]],
         Ray r(c.center, ray_direction);
         color_acc += ray_color(r, world, count, seed);
     }
-    pixel_color[idx] = color_acc / c.samples_per_pixel;
+    pixel_color[idx] = float3(linear_to_gamma(color_acc.x / c.samples_per_pixel),
+                              linear_to_gamma(color_acc.y / c.samples_per_pixel),
+                              linear_to_gamma(color_acc.z / c.samples_per_pixel));
 }
