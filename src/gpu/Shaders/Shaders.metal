@@ -174,7 +174,7 @@ float3 ray_color(thread const Ray& r, constant Sphere* world, constant uint& cou
     {
 
         HitRecord rec;
-        if (hit(world, count, curr_ray, 0.0f, INFINITY, rec))
+        if (hit(world, count, curr_ray, 0.001f, INFINITY, rec))
         {
             float3 direction = random_on_hemisphere(rec.normal, seed);
             curr_attenuation *= 0.5f;
