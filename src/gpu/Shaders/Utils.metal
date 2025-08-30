@@ -1,3 +1,5 @@
+#pragma once
+
 // Returns a random real in [0,1).
 float random_float(thread RNG& seed)
 {

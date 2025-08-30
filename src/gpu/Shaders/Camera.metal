@@ -1,3 +1,5 @@
+#pragma once
+
 struct Camera
 {
     float3 pixel00_loc;

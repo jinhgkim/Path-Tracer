@@ -1,3 +1,5 @@
+#pragma once
+
 struct Sphere
 {
     float3 center;

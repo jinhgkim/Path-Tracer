@@ -1,3 +1,5 @@
+#pragma once
+
 struct Ray
 {
     float3 orig;

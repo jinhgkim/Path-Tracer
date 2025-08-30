@@ -1,3 +1,5 @@
+#pragma once
+
 struct HitRecord
 {
     float3 p;
