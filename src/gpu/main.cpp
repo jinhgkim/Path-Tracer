@@ -26,10 +26,37 @@ struct Camera
     uint samples_per_pixel;
 };
 
+enum MaterialType
+{
+    LAMBERTIAN,
+    METAL
+};
+
+struct Lambertian
+{
+    simd::float3 albedo;
+};
+
+struct Metal
+{
+    simd::float3 albedo;
+};
+
+struct Material
+{
+    MaterialType type;
+    union
+    {
+        Lambertian lambertian;
+        Metal metal;
+    };
+};
+
 struct Sphere
 {
     simd::float3 center;
     float radius;
+    Material mat;
 };
 
 int main()
@@ -63,8 +90,28 @@ int main()
     c.samples_per_pixel = 100;
 
     // World
-    std::vector<Sphere> world = {{simd::float3{0.0f, 0.0f, -1.0f}, 0.5f},
-                                 {simd::float3{0.0f, -100.5f, -1.0f}, 100.0f}};
+    std::vector<Sphere> world;
+
+    Material material_ground;
+    material_ground.type = LAMBERTIAN;
+    material_ground.lambertian.albedo = simd::float3{0.8f, 0.8f, 0.0f};
+
+    Material material_center;
+    material_center.type = LAMBERTIAN;
+    material_center.lambertian.albedo = simd::float3{0.1f, 0.2f, 0.5f};
+
+    Material material_left;
+    material_left.type = METAL;
+    material_left.metal.albedo = simd::float3{0.8f, 0.8f, 0.8f};
+
+    Material material_right;
+    material_right.type = METAL;
+    material_right.metal.albedo = simd::float3{0.8f, 0.6f, 0.2f};
+
+    world.push_back({simd::float3{0.0f, -100.5f, -1.0f}, 100.0f, material_ground});
+    world.push_back({simd::float3{0.0f, 0.0f, -1.2f}, 0.5f, material_center});
+    world.push_back({simd::float3{-1.0f, 0.0f, -1.0f}, 0.5f, material_left});
+    world.push_back({simd::float3{1.0f, 0.0f, -1.0f}, 0.5f, material_right});
 
     // C++ RAII
     NS::AutoreleasePool* pool = NS::AutoreleasePool::alloc()->init();
