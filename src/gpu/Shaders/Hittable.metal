@@ -6,6 +6,7 @@ struct HitRecord
     float3 normal;
     float t;
     bool front_face;
+    Material mat;
 
     void set_face_normal(thread const Ray& r, thread const float3& outward_normal)
     {

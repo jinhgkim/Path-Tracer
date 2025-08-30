@@ -4,6 +4,7 @@ struct Sphere
 {
     float3 center;
     float radius;
+    Material mat;
 
     bool hit(thread const Ray& r, float ray_tmin, float ray_tmax,
              thread HitRecord& rec) const constant
@@ -33,6 +34,7 @@ struct Sphere
 
         float3 outward_normal = (rec.p - center) / radius;
         rec.set_face_normal(r, outward_normal);
+        rec.mat = mat;
 
         return true;
     }

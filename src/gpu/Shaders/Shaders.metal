@@ -2,6 +2,7 @@
 #include "RNG.metal"
 #include "Utils.metal"
 #include "Ray.metal"
+#include "Material.metal"
 #include "Hittable.metal"
 #include "Sphere.metal"
 #include "Camera.metal"
@@ -32,17 +33,25 @@ float3 ray_color(thread const Ray& r, constant Sphere* world, constant uint& cou
                  thread RNG& seed)
 {
     Ray curr_ray = r;
-    float curr_attenuation = 1.0f;
+    float3 curr_attenuation = float3(1.0f, 1.0f, 1.0f);
 
     for (int i = 0; i < 50; i++)
     {
-
         HitRecord rec;
         if (hit(world, count, curr_ray, 0.001f, INFINITY, rec))
         {
-            float3 direction = rec.normal + random_unit_vector(seed);
-            curr_attenuation *= 0.5f;
-            curr_ray = Ray(rec.p, direction);
+            if (rec.mat.type == LAMBERTIAN)
+            {
+                float3 scatter_direction = rec.normal + random_unit_vector(seed);
+                curr_ray = Ray(rec.p, scatter_direction);
+                curr_attenuation *= rec.mat.lambertian.albedo;
+            }
+            else if (rec.mat.type == METAL)
+            {
+                float3 reflected = metal::reflect(curr_ray.direction(), rec.normal);
+                curr_ray = Ray(rec.p, reflected);
+                curr_attenuation *= rec.mat.metal.albedo;
+            }
         }
         else
         {
