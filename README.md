@@ -22,6 +22,13 @@ cmake .. -DBUILD_GPU_PT=ON
 make
 ```
 
+## Run
+
+```bash
+// Move 'default.metallib' to the build directory so the executable can find it
+./gpu_pt > output.ppm
+```
+
 ## References
 
 - [GPU Programming with the Metal Shading Language](https://www.youtube.com/watch?v=VQK28rRK6OU): A very good intro video on GPU programming with Metal
@@ -41,5 +48,23 @@ A CPU-based path tracer written in C++, based on [_Ray Tracing in One Weekend_](
 - **Render Time:**
   - **Single-threaded:** 6h 6m 44s
   - **Multi-threaded (8 cores):** 53m 42s
+  - **Multi-threaded (8 cores) + `BVH`:** 8m 54s
 
-Parallelized with C++17 parallel algorithms (`std::execution::par`) and Intel TBB, achieving over **6× speedup** in scanline rendering.
+Leveraging C++17 parallel algorithms (`std::execution::par`) and Intel TBB, the implementation achieves over **40× speedup** in scanline rendering when combined with `BVH` acceleration.
+
+## Build
+
+To build the c++ code:
+
+```bash
+// From the build dir
+cmake .. -DBUILD_CPU_PT=ON -DCMAKE_CXX_COMPILER=g++-15
+make
+```
+
+## Run
+
+```bash
+// From the build dir
+./cpu_pt > output.ppm
+```
