@@ -1,6 +1,7 @@
 #ifndef HITTABLE_H
 #define HITTABLE_H
 
+#include "aabb.h"
 #include "interval.h"
 #include "ray.h"
 #include "vec3.h"
@@ -32,6 +33,8 @@ class hittable
     virtual ~hittable() = default;
 
     virtual bool hit(const ray& r, interval ray_t, hit_record& rec) const = 0;
+
+    virtual aabb bounding_box() const = 0;
 };
 
 #endif
