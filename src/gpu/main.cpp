@@ -40,6 +40,7 @@ struct Lambertian
 struct Metal
 {
     simd::float3 albedo;
+    float fuzz;
 };
 
 struct Material
@@ -103,10 +104,12 @@ int main()
     Material material_left;
     material_left.type = METAL;
     material_left.metal.albedo = simd::float3{0.8f, 0.8f, 0.8f};
+    material_left.metal.fuzz = 0.3;
 
     Material material_right;
     material_right.type = METAL;
     material_right.metal.albedo = simd::float3{0.8f, 0.6f, 0.2f};
+    material_right.metal.fuzz = 1.0;
 
     world.push_back({simd::float3{0.0f, -100.5f, -1.0f}, 100.0f, material_ground});
     world.push_back({simd::float3{0.0f, 0.0f, -1.2f}, 0.5f, material_center});

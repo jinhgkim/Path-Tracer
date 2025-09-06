@@ -14,6 +14,7 @@ struct Lambertian
 struct Metal
 {
     float3 albedo;
+    float fuzz;
 };
 
 struct Material

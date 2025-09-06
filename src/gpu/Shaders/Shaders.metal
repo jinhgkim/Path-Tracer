@@ -47,10 +47,14 @@ float3 ray_color(thread const Ray& r, constant Sphere* world, constant uint& cou
                 curr_attenuation *= rec.mat.lambertian.albedo;
             }
             else if (rec.mat.type == METAL)
-            {
+            {   
+                float fuzz  = rec.mat.metal.fuzz < 1 ? rec.mat.metal.fuzz : 1;
                 float3 reflected = metal::reflect(curr_ray.direction(), rec.normal);
+                reflected = normalize(reflected) + (fuzz * random_unit_vector(seed));
                 curr_ray = Ray(rec.p, reflected);
-                curr_attenuation *= rec.mat.metal.albedo;
+                
+                if (metal::dot(curr_ray.direction(), rec.normal) > 0)
+                    curr_attenuation *= rec.mat.metal.albedo;
             }
         }
         else
