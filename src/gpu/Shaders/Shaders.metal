@@ -47,14 +47,33 @@ float3 ray_color(thread const Ray& r, constant Sphere* world, constant uint& cou
                 curr_attenuation *= rec.mat.lambertian.albedo;
             }
             else if (rec.mat.type == METAL)
-            {   
-                float fuzz  = rec.mat.metal.fuzz < 1 ? rec.mat.metal.fuzz : 1;
+            {
+                float fuzz = rec.mat.metal.fuzz < 1.0f ? rec.mat.metal.fuzz : 1.0f;
                 float3 reflected = metal::reflect(curr_ray.direction(), rec.normal);
                 reflected = normalize(reflected) + (fuzz * random_unit_vector(seed));
                 curr_ray = Ray(rec.p, reflected);
-                
+
                 if (metal::dot(curr_ray.direction(), rec.normal) > 0)
                     curr_attenuation *= rec.mat.metal.albedo;
+            }
+            else if (rec.mat.type == DIELECTRIC)
+            {
+                float ri = rec.front_face ? (1.0f / rec.mat.dielectric.refraction_index)
+                                          : rec.mat.dielectric.refraction_index;
+
+                float3 unit_direction = normalize(curr_ray.direction());
+                float cos_theta = metal::fmin(dot(-unit_direction, rec.normal), 1.0f);
+                float sin_theta = metal::sqrt(1.0f - cos_theta * cos_theta);
+
+                bool cannot_refract = ri * sin_theta > 1.0f;
+                float3 direction;
+
+                if (cannot_refract || Dielectric::reflectance(cos_theta, ri) > random_float(seed))
+                    direction = metal::reflect(unit_direction, rec.normal);
+                else
+                    direction = metal::refract(unit_direction, rec.normal, ri);
+
+                curr_ray = Ray(rec.p, direction);
             }
         }
         else

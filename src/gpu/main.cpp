@@ -29,7 +29,8 @@ struct Camera
 enum MaterialType
 {
     LAMBERTIAN,
-    METAL
+    METAL,
+    DIELECTRIC
 };
 
 struct Lambertian
@@ -43,6 +44,11 @@ struct Metal
     float fuzz;
 };
 
+struct Dielectric
+{
+    float refraction_index;
+};
+
 struct Material
 {
     MaterialType type;
@@ -50,6 +56,7 @@ struct Material
     {
         Lambertian lambertian;
         Metal metal;
+        Dielectric dielectric;
     };
 };
 
@@ -102,9 +109,12 @@ int main()
     material_center.lambertian.albedo = simd::float3{0.1f, 0.2f, 0.5f};
 
     Material material_left;
-    material_left.type = METAL;
-    material_left.metal.albedo = simd::float3{0.8f, 0.8f, 0.8f};
-    material_left.metal.fuzz = 0.3;
+    material_left.type = DIELECTRIC;
+    material_left.dielectric.refraction_index = 1.5f;
+
+    Material material_bubble;
+    material_bubble.type = DIELECTRIC;
+    material_bubble.dielectric.refraction_index = 1.0f / 1.5f;
 
     Material material_right;
     material_right.type = METAL;
@@ -114,6 +124,7 @@ int main()
     world.push_back({simd::float3{0.0f, -100.5f, -1.0f}, 100.0f, material_ground});
     world.push_back({simd::float3{0.0f, 0.0f, -1.2f}, 0.5f, material_center});
     world.push_back({simd::float3{-1.0f, 0.0f, -1.0f}, 0.5f, material_left});
+    world.push_back({simd::float3{-1.0f, 0.0f, -1.0f}, 0.4f, material_bubble});
     world.push_back({simd::float3{1.0f, 0.0f, -1.0f}, 0.5f, material_right});
 
     // C++ RAII

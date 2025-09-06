@@ -3,7 +3,8 @@
 enum MaterialType
 {
     LAMBERTIAN,
-    METAL
+    METAL,
+    DIELECTRIC
 };
 
 struct Lambertian
@@ -17,6 +18,19 @@ struct Metal
     float fuzz;
 };
 
+struct Dielectric
+{
+    float refraction_index;
+
+    static float reflectance(float cosine, float refraction_index)
+    {
+        // Use Schlick's approximation for reflectance.
+        float r0 = (1.0f - refraction_index) / (1.0f + refraction_index);
+        r0 = r0 * r0;
+        return r0 + (1.0f - r0) * metal::pow((1.0f - cosine), 5.0f);
+    }
+};
+
 struct Material
 {
     MaterialType type;
@@ -24,5 +38,6 @@ struct Material
     {
         Lambertian lambertian;
         Metal metal;
+        Dielectric dielectric;
     };
 };
