@@ -6,26 +6,29 @@ A GPU-accelerated path tracer written in C++ using **Metal** via [`metal-cpp`](h
 
 ## Build
 
-To compile the Metal shader (`Shaders.metal`) into a `.metallib`:
+From the directory containing `Shaders.metal`:
 
 ```bash
-// From the directory containing Shaders.metal
 xcrun -sdk macosx metal -c Shaders.metal -o Shaders.air
 xcrun -sdk macosx metallib Shaders.air -o default.metallib
 ```
 
-To build the c++ code:
+to compile the Metal shader (`Shaders.metal`) into a `.metallib`.
+
+From the `build` directory:
 
 ```bash
-// From the build dir
 cmake .. -DBUILD_GPU_PT=ON
 make
 ```
 
+to build the c++ code.
+
 ## Run
 
+Move `default.metallib` to the `build` directory so the executable can find it and run:
+
 ```bash
-// Move 'default.metallib' to the build directory so the executable can find it
 ./gpu_pt > output.ppm
 ```
 
@@ -54,17 +57,19 @@ Leveraging C++17 parallel algorithms (`std::execution::par`) and Intel TBB, the 
 
 ## Build
 
-To build the c++ code:
+From the `build` directory:
 
 ```bash
-// From the build dir
 cmake .. -DBUILD_CPU_PT=ON -DCMAKE_CXX_COMPILER=g++-15
 make
 ```
 
+to build the c++ code.
+
 ## Run
 
+From the `build` directory:
+
 ```bash
-// From the build dir
 ./cpu_pt > output.ppm
 ```
