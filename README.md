@@ -1,8 +1,6 @@
-# GPU Path Tracer (WIP)
+# GPU Path Tracer
 
 A GPU-accelerated path tracer written in C++ using **Metal** via [`metal-cpp`](https://developer.apple.com/metal/cpp/).
-
-![gpu scene](https://github.com/jinhgkim/Path-Tracer/blob/main/img/gpu_material.png)
 
 ## Build
 
