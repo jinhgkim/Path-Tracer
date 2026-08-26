@@ -1,8 +1,18 @@
-# GPU Path Tracer (WIP)
+# GPU Path Tracer
 
-A GPU-accelerated path tracer written in C++ using **Metal** via [`metal-cpp`](https://developer.apple.com/metal/cpp/).
+A GPU-accelerated path tracer written in C++ using **Metal** via [metal-cpp](https://developer.apple.com/metal/cpp/).
 
-![gpu scene](https://github.com/jinhgkim/Path-Tracer/blob/main/img/gpu_material.png)
+
+## Prerequisites
+
+The GPU path tracer requires macOS with the Xcode command line tools, which
+provide `xcrun`, the Metal compiler, and the Metal framework:
+
+```bash
+xcode-select --install
+```
+
+`metal-cpp` is vendored in this repo, so there is nothing else to install.
 
 ## Build
 
@@ -15,21 +25,21 @@ xcrun -sdk macosx metallib Shaders.air -o default.metallib
 
 to compile the Metal shader (`Shaders.metal`) into a `.metallib`.
 
-From the `build` directory:
+From the project root directory:
 
 ```bash
-cmake .. -DBUILD_GPU_PT=ON
-make
+cmake -S . -B build -DBUILD_GPU_PT=ON
+cmake --build build
 ```
 
 to build the c++ code.
 
 ## Run
 
-Move `default.metallib` to the `build` directory so the executable can find it and run:
+Move `default.metallib` to the `build` directory so the executable can find it, and run the following from the project root directory:
 
 ```bash
-./gpu_pt > output.ppm
+./build/gpu_pt > output.ppm
 ```
 
 ## References
@@ -51,25 +61,31 @@ A CPU-based path tracer written in C++, based on [_Ray Tracing in One Weekend_](
 - **Render Time:**
   - **Single-threaded:** 6h 6m 44s
   - **Multi-threaded (8 cores):** 53m 42s
-  - **Multi-threaded (8 cores) + `BVH`:** 8m 54s
+  - **Multi-threaded (8 cores) + `BVH`:** 2m 12s
+  
 
-Leveraging C++17 parallel algorithms (`std::execution::par`) and Intel TBB, the implementation achieves over **40× speedup** in scanline rendering when combined with `BVH` acceleration.
+## Prerequisites
+
+The CPU path tracer uses [oneTBB](https://github.com/uxlfoundation/oneTBB) for
+multithreading:
+
+```bash
+brew install tbb
+```
 
 ## Build
 
-From the `build` directory:
+From the project root directory:
 
 ```bash
-cmake .. -DBUILD_CPU_PT=ON -DCMAKE_CXX_COMPILER=g++-15
-make
+cmake -S . -B build -DBUILD_CPU_PT=ON
+cmake --build build
 ```
 
 to build the c++ code.
 
 ## Run
 
-From the `build` directory:
-
 ```bash
-./cpu_pt > output.ppm
+./build/cpu_pt > output.ppm
 ```
