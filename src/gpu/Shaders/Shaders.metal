@@ -90,6 +90,7 @@ kernel void render(device float3* pixel_color   [[buffer(0)]],
                    constant Camera& c           [[buffer(1)]],
                    constant Sphere* world       [[buffer(2)]],
                    constant uint& count         [[buffer(3)]],
+                   constant uint2& sample_range [[buffer(4)]],
                    uint2 gid        [[thread_position_in_grid]])
 {
     if (gid.x >= c.image_width || gid.y >= c.image_height)
@@ -97,17 +98,16 @@ kernel void render(device float3* pixel_color   [[buffer(0)]],
 
     uint idx = gid.y * c.image_width + gid.x;
 
+    RNG seed;
+    seed.init(idx * 0x9e3779b9u + sample_range.x * 0x85ebca6bu);
+
     float3 color_acc(0.0f, 0.0f, 0.0f);
 
-    RNG seed;
-    seed.init(idx);
-
-    for (uint s = 0; s < c.samples_per_pixel; s++)
+    for (uint s = 0; s < sample_range.y; s++)
     {
         Ray r = c.get_ray(gid.x, gid.y, seed);
         color_acc += ray_color(r, world, count, seed);
     }
-    pixel_color[idx] = float3(linear_to_gamma(color_acc.x / c.samples_per_pixel),
-                              linear_to_gamma(color_acc.y / c.samples_per_pixel),
-                              linear_to_gamma(color_acc.z / c.samples_per_pixel));
+
+    pixel_color[idx] += color_acc;
 }

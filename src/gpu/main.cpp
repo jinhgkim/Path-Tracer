@@ -1,7 +1,9 @@
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <iomanip>
 #include <iostream>
 #include <random>
@@ -33,6 +35,34 @@ struct Camera
 inline float degrees_to_radians(float degrees)
 {
     return degrees * float(M_PI) / 180.0f;
+}
+
+// Returns a random real in [0,1).
+inline float random_float()
+{
+    // Divide in double: RAND_MAX + 1 is not representable in float.
+    return float(std::rand() / (RAND_MAX + 1.0));
+}
+
+// Returns a random real in [min,max).
+inline float random_float(float min, float max)
+{
+    return min + (max - min) * random_float();
+}
+
+inline simd::float3 random_vec3()
+{
+    return simd::float3{random_float(), random_float(), random_float()};
+}
+
+inline float linear_to_gamma(float linear_component)
+{
+    return linear_component > 0.0f ? std::sqrt(linear_component) : 0.0f;
+}
+
+inline simd::float3 random_vec3(float min, float max)
+{
+    return simd::float3{random_float(min, max), random_float(min, max), random_float(min, max)};
 }
 
 enum MaterialType
@@ -83,7 +113,7 @@ int main()
     // Image
     const float aspect_ratio = 16.0 / 9.0;
 
-    c.image_width = 400;
+    c.image_width = 1200;
     c.image_height = int(c.image_width / aspect_ratio);
     c.image_height = (c.image_height < 1) ? 1 : c.image_height;
 
@@ -91,12 +121,12 @@ int main()
 
     // Camera
     float vfov = 20.0f; // Vertical field of view
-    simd::float3 lookfrom = simd::float3{-2.0f, 2.0f, 1.0f};
-    simd::float3 lookat = simd::float3{0.0f, 0.0f, -1.0f};
+    simd::float3 lookfrom = simd::float3{13.0f, 2.0f, 3.0f};
+    simd::float3 lookat = simd::float3{0.0f, 0.0f, 0.0f};
     simd::float3 vup = simd::float3{0.0f, 1.0f, 0.0f}; // Camera-relative "up" direction
 
-    c.defocus_angle = 10.0f;
-    float focus_dist = 3.4f; // Distance from lookfrom to the plane of perfect focus
+    c.defocus_angle = 0.6f;
+    float focus_dist = 10.0f; // Distance from lookfrom to the plane of perfect focus
 
     c.center = lookfrom;
 
@@ -125,37 +155,75 @@ int main()
     c.defocus_disk_u = u * defocus_radius;
     c.defocus_disk_v = v * defocus_radius;
 
-    c.samples_per_pixel = 100;
+    c.samples_per_pixel = 500;
 
     // World
     std::vector<Sphere> world;
 
-    Material material_ground;
-    material_ground.type = LAMBERTIAN;
-    material_ground.lambertian.albedo = simd::float3{0.8f, 0.8f, 0.0f};
+    auto make_lambertian = [](simd::float3 albedo)
+    {
+        Material m;
+        m.type = LAMBERTIAN;
+        m.lambertian.albedo = albedo;
+        return m;
+    };
 
-    Material material_center;
-    material_center.type = LAMBERTIAN;
-    material_center.lambertian.albedo = simd::float3{0.1f, 0.2f, 0.5f};
+    auto make_metal = [](simd::float3 albedo, float fuzz)
+    {
+        Material m;
+        m.type = METAL;
+        m.metal.albedo = albedo;
+        m.metal.fuzz = fuzz;
+        return m;
+    };
 
-    Material material_left;
-    material_left.type = DIELECTRIC;
-    material_left.dielectric.refraction_index = 1.5f;
+    auto make_dielectric = [](float refraction_index)
+    {
+        Material m;
+        m.type = DIELECTRIC;
+        m.dielectric.refraction_index = refraction_index;
+        return m;
+    };
 
-    Material material_bubble;
-    material_bubble.type = DIELECTRIC;
-    material_bubble.dielectric.refraction_index = 1.0f / 1.5f;
+    world.push_back({simd::float3{0.0f, -1000.0f, 0.0f}, 1000.0f,
+                     make_lambertian(simd::float3{0.5f, 0.5f, 0.5f})});
 
-    Material material_right;
-    material_right.type = METAL;
-    material_right.metal.albedo = simd::float3{0.8f, 0.6f, 0.2f};
-    material_right.metal.fuzz = 1.0;
+    for (int a = -11; a < 11; a++)
+    {
+        for (int b = -11; b < 11; b++)
+        {
+            auto choose_mat = random_float();
+            simd::float3 center{a + 0.9f * random_float(), 0.2f, b + 0.9f * random_float()};
 
-    world.push_back({simd::float3{0.0f, -100.5f, -1.0f}, 100.0f, material_ground});
-    world.push_back({simd::float3{0.0f, 0.0f, -1.2f}, 0.5f, material_center});
-    world.push_back({simd::float3{-1.0f, 0.0f, -1.0f}, 0.5f, material_left});
-    world.push_back({simd::float3{-1.0f, 0.0f, -1.0f}, 0.4f, material_bubble});
-    world.push_back({simd::float3{1.0f, 0.0f, -1.0f}, 0.5f, material_right});
+            if (simd::length(center - simd::float3{4.0f, 0.2f, 0.0f}) > 0.9f)
+            {
+                if (choose_mat < 0.8f)
+                {
+                    // diffuse
+                    auto albedo = random_vec3() * random_vec3();
+                    world.push_back({center, 0.2f, make_lambertian(albedo)});
+                }
+                else if (choose_mat < 0.95f)
+                {
+                    // metal
+                    auto albedo = random_vec3(0.5f, 1.0f);
+                    auto fuzz = random_float(0.0f, 0.5f);
+                    world.push_back({center, 0.2f, make_metal(albedo, fuzz)});
+                }
+                else
+                {
+                    // glass
+                    world.push_back({center, 0.2f, make_dielectric(1.5f)});
+                }
+            }
+        }
+    }
+
+    world.push_back({simd::float3{0.0f, 1.0f, 0.0f}, 1.0f, make_dielectric(1.5f)});
+    world.push_back(
+        {simd::float3{-4.0f, 1.0f, 0.0f}, 1.0f, make_lambertian(simd::float3{0.4f, 0.2f, 0.1f})});
+    world.push_back(
+        {simd::float3{4.0f, 1.0f, 0.0f}, 1.0f, make_metal(simd::float3{0.7f, 0.6f, 0.5f}, 0.0f)});
 
     // C++ RAII
     NS::AutoreleasePool* pool = NS::AutoreleasePool::alloc()->init();
@@ -198,53 +266,82 @@ int main()
     auto worldBuff = device->newBuffer(world.data(), world.size() * sizeof(Sphere), mode);
     uint count = static_cast<uint>(world.size());
     auto countBuff = device->newBuffer(&count, sizeof(uint), mode);
+    auto sampleRangeBuff = device->newBuffer(sizeof(simd::uint2), mode);
 
     // GPU timer starts
     auto timerStart = Clock::now();
 
-    // Create a buffer to be sent to the command queue
-    auto comandBuffer = commandQueue->commandBuffer();
+    // The GPU watchdog kills long command buffers, so the render is spread over many. Sample
+    // slices keep each dispatch cheap.
+    const uint samples_per_dispatch = 1;
 
-    // Create an encoder to set vaulues on the compute function
-    auto commandEncoder = comandBuffer->computeCommandEncoder();
-    commandEncoder->setComputePipelineState(pipe);
+    // The kernel accumulates into this buffer
+    std::memset(imageBuff->contents(), 0, num_pixels * sizeof(simd::float3));
 
-    // Set the parameters of our gpu function
-    commandEncoder->setBuffer(imageBuff, 0, 0);
-    commandEncoder->setBuffer(cameraBuff, 0, 1);
-    commandEncoder->setBuffer(worldBuff, 0, 2);
-    commandEncoder->setBuffer(countBuff, 0, 3);
+    for (uint first = 0; first < c.samples_per_pixel; first += samples_per_dispatch)
+    {
+        simd::uint2 range{first, std::min(samples_per_dispatch, c.samples_per_pixel - first)};
+        *static_cast<simd::uint2*>(sampleRangeBuff->contents()) = range;
 
-    // Figure out how many threads we need to use for our operation
-    MTL::Size gridSize = MTL::Size::Make(c.image_width, c.image_height, 1);
-    MTL::Size threadgroupSize = MTL::Size::Make(16, 16, 1); // 16×16 = 256
-    commandEncoder->dispatchThreads(gridSize, threadgroupSize);
+        std::clog << "\rSamples remaining: " << (c.samples_per_pixel - first) << "    "
+                  << std::flush;
 
-    // Tell the encoder that it is done encoding.  Now we can send this off to the gpu.
-    commandEncoder->endEncoding();
+        // Create a buffer to be sent to the command queue
+        auto commandBuffer = commandQueue->commandBuffer();
 
-    // Push this command to the command queue for processing
-    comandBuffer->commit();
+        // Create an encoder to set vaulues on the compute function
+        auto commandEncoder = commandBuffer->computeCommandEncoder();
+        commandEncoder->setComputePipelineState(pipe);
 
-    // Wait until the gpu function completes before working with any of the data
-    comandBuffer->waitUntilCompleted();
+        // Set the parameters of our gpu function
+        commandEncoder->setBuffer(imageBuff, 0, 0);
+        commandEncoder->setBuffer(cameraBuff, 0, 1);
+        commandEncoder->setBuffer(worldBuff, 0, 2);
+        commandEncoder->setBuffer(countBuff, 0, 3);
+        commandEncoder->setBuffer(sampleRangeBuff, 0, 4);
+
+        // Figure out how many threads we need to use for our operation
+        MTL::Size gridSize = MTL::Size::Make(c.image_width, c.image_height, 1);
+        MTL::Size threadgroupSize = MTL::Size::Make(16, 16, 1); // 16x16 = 256
+        commandEncoder->dispatchThreads(gridSize, threadgroupSize);
+
+        // Tell the encoder that it is done encoding.  Now we can send this off to the gpu.
+        commandEncoder->endEncoding();
+
+        // Push this command to the command queue for processing
+        commandBuffer->commit();
+
+        // Wait  until the gpu function completes before working with any of the data
+        commandBuffer->waitUntilCompleted();
+
+        if (auto err = commandBuffer->error())
+        {
+            std::cerr << "\nGPU error at sample " << first << ": "
+                      << err->localizedDescription()->utf8String() << '\n';
+            return 1;
+        }
+    }
+    std::clog << "\rSamples remaining: 0    \n";
 
     // Get the pointer to the beginning of our data
     const simd::float3* pixels = static_cast<const simd::float3*>(imageBuff->contents());
 
     // Output an image
+    float scale = 1.0f / c.samples_per_pixel;
     std::cout << "P3\n" << c.image_width << " " << c.image_height << "\n255\n";
     for (int j = 0; j < c.image_height; j++)
     {
-        std::clog << "\rScanlines remaining: " << (c.image_height - j) << ' ' << std::flush;
+        std::clog << "\rWriting scanline: " << (j + 1) << '/' << c.image_height << "    "
+                  << std::flush;
         for (int i = 0; i < c.image_width; i++)
         {
             size_t idx = j * c.image_width + i;
-            simd::float3 pixel = pixels[idx];
+            simd::float3 pixel = pixels[idx] * scale;
 
-            int ir = int(255.99 * pixel[0]);
-            int ig = int(255.99 * pixel[1]);
-            int ib = int(255.99 * pixel[2]);
+            // Apply gamma to the final pixel
+            int ir = int(255.99 * linear_to_gamma(pixel[0]));
+            int ig = int(255.99 * linear_to_gamma(pixel[1]));
+            int ib = int(255.99 * linear_to_gamma(pixel[2]));
 
             std::cout << ir << " " << ig << " " << ib << "\n";
         }
@@ -264,6 +361,7 @@ int main()
     cameraBuff->release();
     worldBuff->release();
     countBuff->release();
+    sampleRangeBuff->release();
     pipe->release();
     fn->release();
     lib->release();

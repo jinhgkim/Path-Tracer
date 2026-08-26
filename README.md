@@ -2,6 +2,15 @@
 
 A GPU-accelerated path tracer written in C++ using **Metal** via [metal-cpp](https://developer.apple.com/metal/cpp/).
 
+![final scene](https://github.com/jinhgkim/Path-Tracer/blob/main/img/final_scene.png)
+
+## Final Render Statistics
+
+- **Resolution:** `1200 x 675`
+- **Samples per Pixel:** `500`
+- **Machine:** Apple MacBook Pro (M1 chip, 8-core GPU)
+- **Render Time:**: 2m 30s
+
 
 ## Prerequisites
 
@@ -50,8 +59,6 @@ Move `default.metallib` to the `build` directory so the executable can find it, 
 # CPU Path Tracer
 
 A CPU-based path tracer written in C++, based on [_Ray Tracing in One Weekend_](https://raytracing.github.io/books/RayTracingInOneWeekend.html), and extended with multithreading support.
-
-![final scene](https://github.com/jinhgkim/Path-Tracer/blob/main/img/final_scene.png)
 
 ## Final Render Statistics
 
