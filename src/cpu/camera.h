@@ -4,7 +4,7 @@
 #include "hittable.h"
 #include "material.h"
 
-#include <execution>
+#include <tbb/parallel_for.h>
 
 class camera
 {
@@ -28,24 +28,21 @@ class camera
 
         std::cout << "P3\n" << image_width << ' ' << image_height << "\n255\n";
 
-#define MT 1
-#if MT
-        std::for_each(std::execution::par, image_height_itr.begin(), image_height_itr.end(),
-                      [this, &world](int j)
-                      {
-                          std::clog << "\rScanlines remaining: " << (image_height - j) << ' '
-                                    << std::flush;
-                          for (int i = 0; i < image_width; i++)
+        tbb::parallel_for(0, image_height,
+                          [this, &world](int j)
                           {
-                              color pixel_color(0, 0, 0);
-                              for (int sample = 0; sample < samples_per_pixel; sample++)
+                              for (int i = 0; i < image_width; i++)
                               {
-                                  ray r = get_ray(i, j);
-                                  pixel_color += ray_color(r, max_depth, world);
+                                  color pixel_color(0, 0, 0);
+                                  for (int sample = 0; sample < samples_per_pixel; sample++)
+                                  {
+                                      ray r = get_ray(i, j);
+                                      pixel_color += ray_color(r, max_depth, world);
+                                  }
+                                  frameBuffer[j * image_width + i] =
+                                      pixel_samples_scale * pixel_color;
                               }
-                              frameBuffer[j * image_width + i] = pixel_samples_scale * pixel_color;
-                          }
-                      });
+                          });
 
         for (int j = 0; j < image_height; j++)
         {
@@ -54,24 +51,6 @@ class camera
                 write_color(std::cout, frameBuffer[j * image_width + i]);
             }
         }
-
-#else
-        for (int j = 0; j < image_height; j++)
-        {
-            std::clog << "\rScanlines remaining: " << (image_height - j) << ' ' << std::flush;
-            for (int i = 0; i < image_width; i++)
-            {
-                color pixel_color(0, 0, 0);
-                for (int sample = 0; sample < samples_per_pixel; sample++)
-                {
-                    ray r = get_ray(i, j);
-                    pixel_color += ray_color(r, max_depth, world);
-                }
-                write_color(std::cout, pixel_samples_scale * pixel_color);
-            }
-        }
-        std::clog << "\rDone.                 \n";
-#endif
     }
 
   private:
@@ -84,7 +63,6 @@ class camera
     vec3 u, v, w; // Camera frame basis vectors
     vec3 defocus_disk_u;
     vec3 defocus_disk_v;
-    std::vector<int> image_height_itr;
     std::vector<color> frameBuffer;
 
     void initialize()
@@ -93,13 +71,6 @@ class camera
         image_height = (image_height < 1) ? 1 : image_height;
 
         frameBuffer.resize(image_width * image_height);
-        image_height_itr.resize(image_height);
-
-        for (int i = 0; i < image_height; i++)
-        {
-            image_height_itr[i] = i;
-        }
-
         pixel_samples_scale = 1.0 / samples_per_pixel;
 
         center = lookfrom;
