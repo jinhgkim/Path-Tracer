@@ -34,6 +34,16 @@ float3 random_unit_vector(thread RNG& seed)
     }
 }
 
+float3 random_in_unit_disk(thread RNG& seed)
+{
+    while (true)
+    {
+        float3 p = float3(random_float(-1.0f, 1.0f, seed), random_float(-1.0f, 1.0f, seed), 0.0f);
+        if (metal::length_squared(p) < 1.0f)
+            return p;
+    }
+}
+
 float3 random_on_hemisphere(thread const float3& normal, thread RNG& seed)
 {
     float3 on_unit_sphere = random_unit_vector(seed);

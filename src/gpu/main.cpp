@@ -1,4 +1,5 @@
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <iomanip>
@@ -21,10 +22,18 @@ struct Camera
     simd::float3 pixel_delta_u;
     simd::float3 pixel_delta_v;
     simd::float3 center;
+    simd::float3 defocus_disk_u;
+    simd::float3 defocus_disk_v;
     uint image_width;
     uint image_height;
     uint samples_per_pixel;
+    float defocus_angle;
 };
+
+inline float degrees_to_radians(float degrees)
+{
+    return degrees * float(M_PI) / 180.0f;
+}
 
 enum MaterialType
 {
@@ -81,19 +90,40 @@ int main()
     int num_pixels = c.image_width * c.image_height;
 
     // Camera
-    simd::float3 focal_length = simd::float3{0.0f, 0.0f, 1.0f};
-    auto viewport_height = 2.0f;
+    float vfov = 20.0f; // Vertical field of view
+    simd::float3 lookfrom = simd::float3{-2.0f, 2.0f, 1.0f};
+    simd::float3 lookat = simd::float3{0.0f, 0.0f, -1.0f};
+    simd::float3 vup = simd::float3{0.0f, 1.0f, 0.0f}; // Camera-relative "up" direction
+
+    c.defocus_angle = 10.0f;
+    float focus_dist = 3.4f; // Distance from lookfrom to the plane of perfect focus
+
+    c.center = lookfrom;
+
+    // Determine viewport dimensions.
+    float theta = degrees_to_radians(vfov);
+    float h = std::tan(theta / 2.0f);
+    auto viewport_height = 2.0f * h * focus_dist;
     auto viewport_width = viewport_height * (float(c.image_width) / c.image_height);
 
-    c.center = simd::float3{0.0f, 0.0f, 0.0f};
-    auto viewport_u = simd::float3{viewport_width, 0, 0};
-    auto viewport_v = simd::float3{0, -viewport_height, 0};
+    // Calculate the u,v,w unit basis vectors for the camera coordinate frame.
+    auto w = simd::normalize(lookfrom - lookat);
+    auto u = simd::normalize(simd::cross(vup, w));
+    auto v = simd::cross(w, u);
+
+    auto viewport_u = viewport_width * u;
+    auto viewport_v = viewport_height * -v;
 
     c.pixel_delta_u = viewport_u / float(c.image_width);
     c.pixel_delta_v = viewport_v / float(c.image_height);
 
-    auto viewport_upper_left = c.center - viewport_u * 0.5f - viewport_v * 0.5f - focal_length;
+    auto viewport_upper_left = c.center - (focus_dist * w) - viewport_u * 0.5f - viewport_v * 0.5f;
     c.pixel00_loc = viewport_upper_left + 0.5f * (c.pixel_delta_u + c.pixel_delta_v);
+
+    // Calculate the camera defocus disk basis vectors.
+    auto defocus_radius = focus_dist * std::tan(degrees_to_radians(c.defocus_angle / 2.0f));
+    c.defocus_disk_u = u * defocus_radius;
+    c.defocus_disk_v = v * defocus_radius;
 
     c.samples_per_pixel = 100;
 
@@ -167,7 +197,7 @@ int main()
     auto cameraBuff = device->newBuffer(&c, sizeof(Camera), mode);
     auto worldBuff = device->newBuffer(world.data(), world.size() * sizeof(Sphere), mode);
     uint count = static_cast<uint>(world.size());
-    auto countBuff = device->newBuffer(&count, sizeof(Sphere), mode);
+    auto countBuff = device->newBuffer(&count, sizeof(uint), mode);
 
     // GPU timer starts
     auto timerStart = Clock::now();

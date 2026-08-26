@@ -104,12 +104,7 @@ kernel void render(device float3* pixel_color   [[buffer(0)]],
 
     for (uint s = 0; s < c.samples_per_pixel; s++)
     {
-        float3 offset = float3(random_float(seed) - 0.5f, random_float(seed) - 0.5f, 0.0f);
-        float3 pixel_sample = c.pixel00_loc + ((gid.x + offset.x) * c.pixel_delta_u) +
-                              ((gid.y + offset.y) * c.pixel_delta_v);
-        float3 ray_direction = pixel_sample - c.center;
-
-        Ray r(c.center, ray_direction);
+        Ray r = c.get_ray(gid.x, gid.y, seed);
         color_acc += ray_color(r, world, count, seed);
     }
     pixel_color[idx] = float3(linear_to_gamma(color_acc.x / c.samples_per_pixel),

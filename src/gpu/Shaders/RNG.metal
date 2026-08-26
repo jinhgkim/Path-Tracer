@@ -4,7 +4,7 @@ struct RNG
 {
     uint state;
 
-    void init(uint x) { state = x; }
+    void init(uint x) { state = x ? x : 0x9e3779b9u; }
 
     uint next_uint()
     {
