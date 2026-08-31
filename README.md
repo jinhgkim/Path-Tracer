@@ -1,16 +1,30 @@
+# Path Tracer
+
+## Contents
+
+- [GPU Path Tracer](#gpu-path-tracer)
+- [CPU Path Tracer](#cpu-path-tracer)
+
+## Final Render Statistics
+
+All renders use the same settings and machine:
+
+- **Resolution:** `1200 x 675`
+- **Samples per Pixel:** `500`
+- **Machine:** Apple MacBook Pro (M1 chip, 8 CPU cores / 8-core GPU)
+
+| Configuration                 | Render Time |
+| ----------------------------- | ----------- |
+| GPU (Metal)                   | 2m 30s      |
+| CPU, single-threaded          | 6h 6m 44s   |
+| CPU, multi-threaded (8 cores) | 53m 42s     |
+| CPU, multi-threaded + `BVH`   | 2m 12s      |
+
 # GPU Path Tracer
 
 A GPU-accelerated path tracer written in C++ using **Metal** via [metal-cpp](https://developer.apple.com/metal/cpp/).
 
 ![final scene](https://github.com/jinhgkim/Path-Tracer/blob/main/img/final_scene.png)
-
-## Final Render Statistics
-
-- **Resolution:** `1200 x 675`
-- **Samples per Pixel:** `500`
-- **Machine:** Apple MacBook Pro (M1 chip, 8-core GPU)
-- **Render Time:**: 2m 30s
-
 
 ## Prerequisites
 
@@ -59,17 +73,6 @@ Move `default.metallib` to the `build` directory so the executable can find it, 
 # CPU Path Tracer
 
 A CPU-based path tracer written in C++, based on [_Ray Tracing in One Weekend_](https://raytracing.github.io/books/RayTracingInOneWeekend.html), and extended with multithreading support.
-
-## Final Render Statistics
-
-- **Resolution:** `1200 × 675`
-- **Samples per Pixel:** `500`
-- **Machine:** Apple MacBook Pro (M1 chip, 8 cores)
-- **Render Time:**
-  - **Single-threaded:** 6h 6m 44s
-  - **Multi-threaded (8 cores):** 53m 42s
-  - **Multi-threaded (8 cores) + `BVH`:** 2m 12s
-  
 
 ## Prerequisites
 
