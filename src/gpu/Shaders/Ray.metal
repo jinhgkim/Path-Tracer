@@ -5,7 +5,7 @@ struct Ray
     float3 orig;
     float3 dir;
 
-    Ray() {}
+    Ray() = default;
     Ray(float3 origin, float3 direction) : orig(origin), dir(direction) {}
 
     float3 origin() const { return orig; }

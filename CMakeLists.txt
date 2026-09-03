@@ -29,9 +29,8 @@ endif()
 
 # === GPU Path Tracer === 
 if (BUILD_GPU_PT)
-    include_directories(metal-cpp)
-
     add_executable(gpu_pt src/gpu/main.cpp)
+    target_include_directories(gpu_pt PRIVATE metal-cpp)
 
     set_source_files_properties(src/gpu/main.cpp PROPERTIES LANGUAGE OBJCXX)
 
@@ -39,6 +38,6 @@ if (BUILD_GPU_PT)
     find_library(FOUNDATION Foundation)
     find_library(QUARTZCORE QuartzCore)
  
-    target_link_libraries(gpu_pt PRIVATE "-framework Metal" "-framework Foundation" "-framework QuartzCore")
+    target_link_libraries(gpu_pt PRIVATE ${METAL} ${FOUNDATION} ${QUARTZCORE})
 
 endif()

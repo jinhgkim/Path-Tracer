@@ -1,6 +1,6 @@
 #pragma once
 
-enum MaterialType
+enum class MaterialType : uint
 {
     LAMBERTIAN,
     METAL,

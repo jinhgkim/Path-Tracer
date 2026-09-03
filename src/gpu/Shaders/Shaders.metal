@@ -40,13 +40,13 @@ float3 ray_color(thread const Ray& r, constant Sphere* world, constant uint& cou
         HitRecord rec;
         if (hit(world, count, curr_ray, 0.001f, INFINITY, rec))
         {
-            if (rec.mat.type == LAMBERTIAN)
+            if (rec.mat.type == MaterialType::LAMBERTIAN)
             {
                 float3 scatter_direction = rec.normal + random_unit_vector(seed);
                 curr_ray = Ray(rec.p, scatter_direction);
                 curr_attenuation *= rec.mat.lambertian.albedo;
             }
-            else if (rec.mat.type == METAL)
+            else if (rec.mat.type == MaterialType::METAL)
             {
                 float fuzz = rec.mat.metal.fuzz < 1.0f ? rec.mat.metal.fuzz : 1.0f;
                 float3 reflected = metal::reflect(curr_ray.direction(), rec.normal);
@@ -56,7 +56,7 @@ float3 ray_color(thread const Ray& r, constant Sphere* world, constant uint& cou
                 if (metal::dot(curr_ray.direction(), rec.normal) > 0)
                     curr_attenuation *= rec.mat.metal.albedo;
             }
-            else if (rec.mat.type == DIELECTRIC)
+            else if (rec.mat.type == MaterialType::DIELECTRIC)
             {
                 float ri = rec.front_face ? (1.0f / rec.mat.dielectric.refraction_index)
                                           : rec.mat.dielectric.refraction_index;
