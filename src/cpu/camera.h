@@ -41,6 +41,8 @@ class camera
         tbb::parallel_for(0, image_height,
                           [this, &world](int j)
                           {
+                              seed_random_generator(static_cast<unsigned int>(j));
+
                               for (int i = 0; i < image_width; i++)
                               {
                                   color pixel_color(0, 0, 0);
