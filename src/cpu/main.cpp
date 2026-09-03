@@ -17,6 +17,9 @@ using namespace pt;
 
 int main()
 {
+    // Seed used to lay out the random spheres below; change it for a different scene.
+    seed_random_generator(2);
+
     hittable_list world;
 
     // Construct world

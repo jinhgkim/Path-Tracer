@@ -110,6 +110,9 @@ struct Sphere
 
 int main()
 {
+    // Seed used to lay out the random spheres below; change it for a different scene.
+    std::srand(2);
+
     Camera c{};
 
     // Image

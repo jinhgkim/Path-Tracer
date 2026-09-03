@@ -18,13 +18,13 @@ All renders use the same settings and machine:
 | GPU (Metal)                   | 2m 30s      |
 | CPU, single-threaded          | 6h 6m 44s   |
 | CPU, multi-threaded (8 cores) | 53m 42s     |
-| CPU, multi-threaded + `BVH`   | 2m 12s      |
+| CPU, multi-threaded + `BVH`   | 1m 57s      |
 
 # GPU Path Tracer
 
 A GPU-accelerated path tracer written in C++ using **Metal** via [metal-cpp](https://developer.apple.com/metal/cpp/).
 
-![final scene](https://github.com/jinhgkim/Path-Tracer/blob/main/img/final_scene.png)
+![final render](https://github.com/jinhgkim/Path-Tracer/blob/main/img/final_render.png)
 
 ## Prerequisites
 
