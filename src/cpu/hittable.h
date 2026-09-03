@@ -1,10 +1,14 @@
-#ifndef HITTABLE_H
-#define HITTABLE_H
+#pragma once
 
 #include "aabb.h"
 #include "interval.h"
 #include "ray.h"
 #include "vec3.h"
+
+#include <memory>
+
+namespace pt
+{
 
 class material;
 
@@ -13,9 +17,9 @@ class hit_record
   public:
     point3 p;
     vec3 normal;
-    shared_ptr<material> mat;
-    double t;
-    bool front_face;
+    std::shared_ptr<material> mat;
+    double t = 0;
+    bool front_face = false;
 
     void set_face_normal(const ray& r, const vec3& outward_normal)
     {
@@ -32,9 +36,9 @@ class hittable
   public:
     virtual ~hittable() = default;
 
-    virtual bool hit(const ray& r, interval ray_t, hit_record& rec) const = 0;
+    [[nodiscard]] virtual bool hit(const ray& r, interval ray_t, hit_record& rec) const = 0;
 
     virtual aabb bounding_box() const = 0;
 };
 
-#endif
+} // namespace pt

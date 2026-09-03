@@ -1,29 +1,34 @@
-#ifndef MATERIAL_H
-#define MATERIAL_H
+#pragma once
 
+#include "color.h"
 #include "hittable.h"
+#include "ray.h"
+#include "rtweekend.h"
+#include "vec3.h"
+
+#include <cmath>
+
+namespace pt
+{
 
 class material
 {
   public:
     virtual ~material() = default;
 
-    virtual bool scatter(const ray& r_in, const hit_record& rec, color& attenuation,
-                         ray& scattered) const
-    {
-        return false;
-    }
+    [[nodiscard]] virtual bool scatter(const ray& r_in, const hit_record& rec, color& attenuation,
+                                       ray& scattered) const = 0;
 };
 
 class lambertian : public material
 {
   public:
-    lambertian(const color& albedo) : albedo(albedo) {}
+    explicit lambertian(const color& albedo) : albedo(albedo) {}
 
-    bool scatter(const ray& r_in, const hit_record& rec, color& attenuation,
+    bool scatter(const ray& /*r_in*/, const hit_record& rec, color& attenuation,
                  ray& scattered) const override
     {
-        auto scatter_direction = rec.normal + random_unit_vector();
+        vec3 scatter_direction = rec.normal + random_unit_vector();
 
         // Catch degenerate scatter direction
         if (scatter_direction.near_zero())
@@ -61,7 +66,7 @@ class metal : public material
 class dielectric : public material
 {
   public:
-    dielectric(double refraction_index) : refraction_index(refraction_index) {}
+    explicit dielectric(double refraction_index) : refraction_index(refraction_index) {}
 
     bool scatter(const ray& r_in, const hit_record& rec, color& attenuation,
                  ray& scattered) const override
@@ -93,10 +98,10 @@ class dielectric : public material
     static double reflectance(double cosine, double refraction_index)
     {
         // Use Schlick's approximation for reflectance.
-        auto r0 = (1 - refraction_index) / (1 + refraction_index);
+        double r0 = (1 - refraction_index) / (1 + refraction_index);
         r0 = r0 * r0;
         return r0 + (1 - r0) * std::pow((1 - cosine), 5);
     }
 };
 
-#endif
+} // namespace pt

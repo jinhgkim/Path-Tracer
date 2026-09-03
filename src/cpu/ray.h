@@ -1,12 +1,14 @@
-#ifndef RAY_H
-#define RAY_H
+#pragma once
 
 #include "vec3.h"
+
+namespace pt
+{
 
 class ray
 {
   public:
-    ray() {}
+    ray() = default;
 
     ray(const point3& origin, const vec3& direction) : orig(origin), dir(direction) {}
 
@@ -20,4 +22,4 @@ class ray
     vec3 dir;
 };
 
-#endif
+} // namespace pt

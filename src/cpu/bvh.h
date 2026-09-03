@@ -1,22 +1,27 @@
-#ifndef BVH_H
-#define BVH_H
-
-#include <algorithm>
+#pragma once
 
 #include "aabb.h"
 #include "hittable.h"
 #include "hittable_list.h"
 
+#include <algorithm>
+#include <cstddef>
+#include <memory>
+#include <vector>
+
+namespace pt
+{
+
 class bvh_node : public hittable
 {
   public:
-    bvh_node(hittable_list list) : bvh_node(list.objects, 0, list.objects.size()) {}
+    explicit bvh_node(hittable_list& list) : bvh_node(list.objects, 0, list.objects.size()) {}
 
-    bvh_node(std::vector<shared_ptr<hittable>>& objects, size_t start, size_t end)
+    bvh_node(std::vector<std::shared_ptr<hittable>>& objects, std::size_t start, std::size_t end)
     {
         // Build the bounding box of the span of source objects.
         bbox = aabb::empty;
-        for (size_t i = start; i < end; i++)
+        for (std::size_t i = start; i < end; i++)
         {
             bbox = aabb(objects[i]->bounding_box(), bbox);
         }
@@ -27,7 +32,7 @@ class bvh_node : public hittable
         // Sort the primitives
         auto comparator = (axis == 0) ? box_x_compare : (axis == 1) ? box_y_compare : box_z_compare;
 
-        size_t object_span = end - start;
+        std::size_t object_span = end - start;
 
         if (object_span == 1)
         {
@@ -44,9 +49,9 @@ class bvh_node : public hittable
             // Put half in each subtree
             std::sort(objects.begin() + start, objects.begin() + end, comparator);
 
-            auto mid = start + object_span / 2;
-            left = make_shared<bvh_node>(objects, start, mid);
-            right = make_shared<bvh_node>(objects, mid, end);
+            std::size_t mid = start + object_span / 2;
+            left = std::make_shared<bvh_node>(objects, start, mid);
+            right = std::make_shared<bvh_node>(objects, mid, end);
         }
     }
 
@@ -64,32 +69,35 @@ class bvh_node : public hittable
     aabb bounding_box() const override { return bbox; }
 
   private:
-    shared_ptr<hittable> left;
-    shared_ptr<hittable> right;
+    std::shared_ptr<hittable> left;
+    std::shared_ptr<hittable> right;
     aabb bbox;
 
-    static bool box_compare(const shared_ptr<hittable> a, const shared_ptr<hittable> b,
+    static bool box_compare(const std::shared_ptr<hittable>& a, const std::shared_ptr<hittable>& b,
                             int axis_index)
     {
-        auto a_axis_interval = a->bounding_box().axis_interval(axis_index);
-        auto b_axis_interval = b->bounding_box().axis_interval(axis_index);
+        interval a_axis_interval = a->bounding_box().axis_interval(axis_index);
+        interval b_axis_interval = b->bounding_box().axis_interval(axis_index);
         return a_axis_interval.min < b_axis_interval.min;
     }
 
-    static bool box_x_compare(const shared_ptr<hittable> a, const shared_ptr<hittable> b)
+    static bool box_x_compare(const std::shared_ptr<hittable>& a,
+                              const std::shared_ptr<hittable>& b)
     {
         return box_compare(a, b, 0);
     }
 
-    static bool box_y_compare(const shared_ptr<hittable> a, const shared_ptr<hittable> b)
+    static bool box_y_compare(const std::shared_ptr<hittable>& a,
+                              const std::shared_ptr<hittable>& b)
     {
         return box_compare(a, b, 1);
     }
 
-    static bool box_z_compare(const shared_ptr<hittable> a, const shared_ptr<hittable> b)
+    static bool box_z_compare(const std::shared_ptr<hittable>& a,
+                              const std::shared_ptr<hittable>& b)
     {
         return box_compare(a, b, 2);
     }
 };
 
-#endif
+} // namespace pt
