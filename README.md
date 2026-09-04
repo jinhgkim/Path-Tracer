@@ -1,91 +1,133 @@
 # Path Tracer
 
-## Contents
+Various implementations for the final scene from
+[_Ray Tracing in One Weekend_](https://raytracing.github.io/books/RayTracingInOneWeekend.html):
 
 - [GPU Path Tracer](#gpu-path-tracer)
+  - Apple's Metal API through [metal-cpp](https://developer.apple.com/metal/cpp/)
 - [CPU Path Tracer](#cpu-path-tracer)
+  - Built-in RTIOW C++ shading backend
+  - [OSL](https://github.com/AcademySoftwareFoundation/OpenShadingLanguage)
+    shading backend
 
-## Final Render Statistics
+## Performance
 
-All renders use the same settings and machine:
+Measurements used a `1200 x 675` image at 500 samples per pixel, on an 8-core
+M1 MacBook Pro:
 
-- **Resolution:** `1200 x 675`
-- **Samples per Pixel:** `500`
-- **Machine:** Apple MacBook Pro (M1 chip, 8 CPU cores / 8-core GPU)
+| Renderer | Shading      | Parallelism     | Traversal | Time       | Speedup |
+| -------- | ------------ | --------------- | --------- | ---------- | ------- |
+| CPU      | Built-in C++ | Single-threaded | Linear    | 6h 06m 44s | 1x      |
+| CPU      | Built-in C++ | Multithreaded   | Linear    | 53m 42s    | 6.8x    |
+| CPU      | Built-in C++ | Multithreaded   | BVH       | 1m 57s     | 188x    |
+| CPU      | OSL          | Multithreaded   | BVH       | 2m 27s     | 150x    |
+| GPU      | Metal        | GPU-parallel    | Linear    | 2m 28s     | 149x    |
 
-| Configuration                 | Render Time |
-| ----------------------------- | ----------- |
-| GPU (Metal)                   | 2m 30s      |
-| CPU, single-threaded          | 6h 6m 44s   |
-| CPU, multi-threaded (8 cores) | 53m 42s     |
-| CPU, multi-threaded + `BVH`   | 1m 57s      |
+Thermal throttling makes absolute times approximate. See
+[OSL_Integration.md](docs/OSL_Integration.md) for OSL integration details.
+
+| ![Built-in C++ render](img/render_builtin.png) | ![OSL render](img/render_osl.png) | ![Metal render](img/render_gpu.png) |
+| :-------------------------------------------: | :-------------------------------: | :---------------------------------: |
+|              CPU · Built-in C++               |             CPU · OSL             |             GPU · Metal             |
 
 # GPU Path Tracer
 
-A GPU-accelerated path tracer written in C++ using **Metal** via [metal-cpp](https://developer.apple.com/metal/cpp/).
+### Requirements
 
-![final render](https://github.com/jinhgkim/Path-Tracer/blob/main/img/final_render.png)
-
-## Prerequisites
-
-The GPU path tracer requires macOS with the Xcode command line tools, which
-provide `xcrun`, the Metal compiler, and the Metal framework:
+The GPU renderer requires macOS and the Xcode command-line tools. `metal-cpp` is
+vendored in this repository.
 
 ```bash
 xcode-select --install
 ```
 
-`metal-cpp` is vendored in this repo, so there is nothing else to install.
+### Build
 
-## Build
-
-From the project root directory:
+From the project root:
 
 ```bash
-cmake -S . -B build/gpu -DBUILD_GPU_PT=ON
+cmake -S . -B build/gpu -DBUILD_GPU_PT=ON -DBUILD_CPU_PT=OFF
 cmake --build build/gpu
 ```
+
+`BUILD_CPU_PT` defaults to `ON`, so leaving it out here would also configure
+`cpu_pt` and require oneTBB.
 
 CMake compiles `src/gpu/Shaders/*.metal` into `build/gpu/default.metallib`,
 beside the executable, where the renderer looks for it.
 
-## Run
+### Run
 
 ```bash
 ./build/gpu/gpu_pt > output.ppm
 ```
 
-## References
-
-- [GPU Programming with the Metal Shading Language](https://www.youtube.com/watch?v=VQK28rRK6OU): A very good intro video on GPU programming with Metal
-- [Accelerated Ray Tracing in One Weekend in CUDA](https://developer.nvidia.com/blog/accelerated-ray-tracing-cuda)
-
 # CPU Path Tracer
 
-A CPU-based path tracer written in C++, based on [_Ray Tracing in One Weekend_](https://raytracing.github.io/books/RayTracingInOneWeekend.html), and extended with multithreading support.
+The CPU renderer shares its geometry, BVH, camera, and threading between two
+material backends:
 
-## Prerequisites
+- `--builtin`: C++ materials modeled on the book.
+- `--osl`: OSL shaders compiled to `.oso` files at build time.
 
-The CPU path tracer uses [oneTBB](https://github.com/uxlfoundation/oneTBB) for
-multithreading:
+OSL support is optional and adds no OSL dependencies to a built-in-only build.
+
+### Requirements
+
+The CPU renderer requires [oneTBB](https://github.com/uxlfoundation/oneTBB):
 
 ```bash
 brew install tbb
 ```
 
-## Build
+The **OSL backend** also requires compatible
+[OpenShadingLanguage](https://github.com/AcademySoftwareFoundation/OpenShadingLanguage)
+and [OpenImageIO](https://github.com/AcademySoftwareFoundation/OpenImageIO)
+installations.
 
-From the project root directory:
+### Build
 
-```bash
-cmake -S . -B build -DBUILD_CPU_PT=ON
-cmake --build build
-```
-
-to build the c++ code.
-
-## Run
+For built-in shading only:
 
 ```bash
-./build/cpu_pt > output.ppm
+cmake -S . -B build/cpu -DBUILD_CPU_PT=ON
+cmake --build build/cpu
 ```
+
+To include **OSL shading**, point CMake at the OSL and OpenImageIO installations if
+they are not already on its search path:
+
+```bash
+OSL_ROOT=$HOME/projects/OpenShadingLanguage/dist
+OIIO_ROOT=$HOME/projects/OpenImageIO/dist
+
+cmake -S . -B build/cpu -DBUILD_CPU_PT=ON -DENABLE_OSL=ON \
+    -DCMAKE_PREFIX_PATH="$OSL_ROOT;$OIIO_ROOT"
+cmake --build build/cpu
+```
+
+CMake compiles `src/cpu/osl/shaders/*.osl` into `build/cpu/shaders/*.oso`. If the
+executable fails to start with a `Library not loaded` error, add the missing
+library's directory with `-DPT_OSL_EXTRA_RPATHS=/path/to/lib`.
+
+### Run
+
+```bash
+./build/cpu/cpu_pt > output.ppm
+```
+
+An OSL-enabled build defaults to `--osl`. Select a backend explicitly when
+comparing the two:
+
+```bash
+./build/cpu/cpu_pt --osl     > osl.ppm
+./build/cpu/cpu_pt --builtin > builtin.ppm
+```
+
+## References
+
+- [_Ray Tracing in One Weekend_](https://raytracing.github.io/books/RayTracingInOneWeekend.html)
+- [GPU Programming with the Metal Shading Language](https://www.youtube.com/watch?v=VQK28rRK6OU)
+- [Accelerated Ray Tracing in One Weekend in CUDA](https://developer.nvidia.com/blog/accelerated-ray-tracing-cuda)
+- [testrender](https://github.com/AcademySoftwareFoundation/OpenShadingLanguage/tree/main/src/testrender),
+  OSL's reference renderer integration

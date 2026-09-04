@@ -21,6 +21,13 @@ class hit_record
     double t = 0;
     bool front_face = false;
 
+#ifdef PT_USE_OSL
+    double u = 0;
+    double v = 0;
+    vec3 dpdu;
+    vec3 dpdv;
+#endif
+
     void set_face_normal(const ray& r, const vec3& outward_normal)
     {
         // Sets the hit record normal vector.

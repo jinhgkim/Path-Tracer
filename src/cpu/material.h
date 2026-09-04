@@ -18,6 +18,10 @@ class material
 
     [[nodiscard]] virtual bool scatter(const ray& r_in, const hit_record& rec, color& attenuation,
                                        ray& scattered) const = 0;
+
+#ifdef PT_USE_OSL
+    [[nodiscard]] virtual bool needs_surface_params() const { return false; }
+#endif
 };
 
 class lambertian : public material

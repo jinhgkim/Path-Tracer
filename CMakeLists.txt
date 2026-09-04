@@ -11,20 +11,93 @@ endif()
 
 
 # === Options ===
-option(BUILD_CPU_PT "Build the CPU path-tracer executable" OFF)
+option(BUILD_CPU_PT "Build the CPU path-tracer executable" ON)
 option(BUILD_GPU_PT "Build the GPU path-tracer executable" OFF)
+
+option(ENABLE_OSL "Compile the OSL shading backend into the CPU path tracer" OFF)
+
+if (ENABLE_OSL AND NOT BUILD_CPU_PT)
+    message(FATAL_ERROR
+        "ENABLE_OSL requires -DBUILD_CPU_PT=ON; OSL shading is built into cpu_pt.")
+endif()
 
 
 # === CPU Path Tracer ===
 if (BUILD_CPU_PT)
-    find_package(TBB QUIET)
+    find_package(TBB CONFIG QUIET)
     if (NOT TBB_FOUND)
         message(FATAL_ERROR
             "TBB not found. The CPU path tracer needs oneTBB for multithreading.\n"
             "Install it with:  brew install tbb\n")
     endif()
+
     add_executable(cpu_pt src/cpu/main.cpp)
+    target_include_directories(cpu_pt PRIVATE src/cpu)
     target_link_libraries(cpu_pt PRIVATE TBB::tbb)
+
+    # --- Optional OSL shading backend ---
+    if (ENABLE_OSL)
+        find_package(OSL CONFIG REQUIRED)
+
+        set(PT_OSL_SHADER_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/cpu/osl/shaders")
+        set(PT_OSL_SHADER_DIR "${CMAKE_CURRENT_BINARY_DIR}/shaders")
+        file(MAKE_DIRECTORY "${PT_OSL_SHADER_DIR}")
+
+        # CONFIGURE_DEPENDS re-globs at build time, so a new shader needs no re-run.
+        file(GLOB OSL_SHADER_SOURCES CONFIGURE_DEPENDS "${PT_OSL_SHADER_SRC_DIR}/*.osl")
+        file(GLOB OSL_SHADER_HEADERS CONFIGURE_DEPENDS "${PT_OSL_SHADER_SRC_DIR}/*.h")
+
+        set(OSL_COMPILED_SHADERS)
+        foreach(shader IN LISTS OSL_SHADER_SOURCES)
+            get_filename_component(shader_name "${shader}" NAME_WE)
+            set(compiled "${PT_OSL_SHADER_DIR}/${shader_name}.oso")
+
+            add_custom_command(
+                OUTPUT "${compiled}"
+                COMMAND "$<TARGET_FILE:OSL::oslc>"
+                    -I "${PT_OSL_SHADER_SRC_DIR}" -o "${compiled}" "${shader}"
+                MAIN_DEPENDENCY "${shader}"
+                DEPENDS ${OSL_SHADER_HEADERS} OSL::oslc
+                COMMENT "Compiling OSL shader ${shader_name}.osl"
+                VERBATIM)
+
+            list(APPEND OSL_COMPILED_SHADERS "${compiled}")
+        endforeach()
+
+        add_custom_target(osl_shaders DEPENDS ${OSL_COMPILED_SHADERS})
+        add_dependencies(cpu_pt osl_shaders)
+
+        target_sources(cpu_pt PRIVATE
+            src/cpu/osl/renderer.cpp
+            src/cpu/osl/shading.cpp)
+
+        target_compile_definitions(cpu_pt PRIVATE
+            PT_USE_OSL
+            PT_OSL_SHADER_PATH="${PT_OSL_SHADER_DIR}")
+
+        # OSL::oslexec supplies its OpenImageIO and Imath dependencies.
+        target_link_libraries(cpu_pt PRIVATE OSL::oslexec)
+
+        # liboslexec may use OSL's vendored pugixml outside the install tree.
+        # OSLConfig.cmake defines OSL_LIB_DIR.
+        get_filename_component(PT_OSL_SOURCE_DIR "${OSL_LIB_DIR}/../.." ABSOLUTE)
+        # Search only OSL paths so a system pugixml is not added to the rpath.
+        find_library(PT_OSL_PUGIXML_LIBRARY pugixml
+            PATHS "${OSL_LIB_DIR}" "${PT_OSL_SOURCE_DIR}/ext/dist/lib"
+            NO_DEFAULT_PATH)
+        if (PT_OSL_PUGIXML_LIBRARY)
+            get_filename_component(PT_PUGIXML_DIR "${PT_OSL_PUGIXML_LIBRARY}" DIRECTORY)
+        endif()
+
+        set(PT_OSL_EXTRA_RPATHS "" CACHE STRING
+            "Extra rpath entries for cpu_pt, for dylibs found nowhere else")
+
+        set(PT_OSL_RPATHS ${PT_PUGIXML_DIR} ${PT_OSL_EXTRA_RPATHS})
+        if (PT_OSL_RPATHS)
+            list(REMOVE_DUPLICATES PT_OSL_RPATHS)
+            set_property(TARGET cpu_pt PROPERTY BUILD_RPATH "${PT_OSL_RPATHS}")
+        endif()
+    endif()
 endif()
 
 
