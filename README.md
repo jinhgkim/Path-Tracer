@@ -23,8 +23,7 @@ M1 MacBook Pro:
 | CPU      | OSL          | Multithreaded   | BVH       | 2m 27s     | 150x    |
 | GPU      | Metal        | GPU-parallel    | Linear    | 2m 28s     | 149x    |
 
-Thermal throttling makes absolute times approximate. See
-[OSL_Integration.md](docs/OSL_Integration.md) for OSL integration details.
+See [OSL_Integration.md](docs/OSL_Integration.md) for details.
 
 | ![Built-in C++ render](img/render_builtin.png) | ![OSL render](img/render_osl.png) | ![Metal render](img/render_gpu.png) |
 | :-------------------------------------------: | :-------------------------------: | :---------------------------------: |
