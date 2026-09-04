@@ -39,30 +39,20 @@ xcode-select --install
 
 ## Build
 
-From the directory containing `Shaders.metal`:
-
-```bash
-xcrun -sdk macosx metal -c Shaders.metal -o Shaders.air
-xcrun -sdk macosx metallib Shaders.air -o default.metallib
-```
-
-to compile the Metal shader (`Shaders.metal`) into a `.metallib`.
-
 From the project root directory:
 
 ```bash
-cmake -S . -B build -DBUILD_GPU_PT=ON
-cmake --build build
+cmake -S . -B build/gpu -DBUILD_GPU_PT=ON
+cmake --build build/gpu
 ```
 
-to build the c++ code.
+CMake compiles `src/gpu/Shaders/*.metal` into `build/gpu/default.metallib`,
+beside the executable, where the renderer looks for it.
 
 ## Run
 
-Move `default.metallib` to the `build` directory so the executable can find it, and run the following from the project root directory:
-
 ```bash
-./build/gpu_pt > output.ppm
+./build/gpu/gpu_pt > output.ppm
 ```
 
 ## References
