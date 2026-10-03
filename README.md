@@ -10,10 +10,11 @@ Various implementations for the final scene from
   - [OSL](https://github.com/AcademySoftwareFoundation/OpenShadingLanguage)
     shading backend
 
-## Performance
+## Benchmarks
 
-Measurements used a `1200 x 675` image at 500 samples per pixel, on an 8-core
-M1 MacBook Pro:
+Measurements used a `1200 x 675` image at 500 samples per pixel.
+
+On an M1 MacBook Pro (8-core CPU, 8-core GPU):
 
 | Renderer | Shading      | Parallelism     | Traversal | Time       | Speedup |
 | -------- | ------------ | --------------- | --------- | ---------- | ------- |
@@ -22,6 +23,14 @@ M1 MacBook Pro:
 | CPU      | Built-in C++ | Multithreaded   | BVH       | 1m 57s     | 188x    |
 | CPU      | OSL          | Multithreaded   | BVH       | 2m 27s     | 150x    |
 | GPU      | Metal        | GPU-parallel    | Linear    | 2m 28s     | 149x    |
+
+On an M5 Pro MacBook Pro (18-core CPU, 20-core GPU):
+
+| Renderer | Shading      | Parallelism   | Traversal | Time |
+| -------- | ------------ | ------------- | --------- | ---- |
+| CPU      | Built-in C++ | Multithreaded | BVH       | 40s  |
+| CPU      | OSL          | Multithreaded | BVH       | 42s  |
+| GPU      | Metal        | GPU-parallel  | Linear    | 24s  |
 
 See [OSL_Integration.md](docs/OSL_Integration.md) for details.
 
