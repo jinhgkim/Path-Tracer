@@ -8,7 +8,7 @@ Various implementations for the final scene from
 - [CPU Path Tracer](#cpu-path-tracer)
   - Built-in RTIOW C++ shading backend
   - [OSL](https://github.com/AcademySoftwareFoundation/OpenShadingLanguage)
-    shading backend
+    shading backend (Presented in [OSL Virtual Town Hall 2026](https://youtu.be/as3fsvMaW6M?si=NOP0IQn40cQolvhd&t=1870))
 
 ## Benchmarks
 
